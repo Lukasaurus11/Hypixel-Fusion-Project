@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from re import sub as re_sub
 from sqlite3 import connect
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Set
 
 from polars import read_csv, DataFrame
 
 
-def fetch_and_process_information(filename: str = 'Full Fusion List - Hypixel SkyBlock - List.csv') -> List[Dict[str, int or str]]:
+def fetch_and_process_information(filename: str = 'Full Fusion List - Hypixel SkyBlock - List.csv') -> List[
+    Dict[str, int or str]]:
     """
     Uses Polars for efficient CSV parsing and transformation.
     Extracts fusion data from a CSV and returns normalized list of records.
@@ -32,22 +33,31 @@ def fetch_and_process_information(filename: str = 'Full Fusion List - Hypixel Sk
 
     df: DataFrame = read_csv(filename, skip_rows=1)
 
-    processed_rows: List = []
+    seen_combinations: Set[Tuple[str, str, str]] = set()
+    processed_rows: List[Dict[str, int or str]] = []
+
     for row in df.iter_rows(named=True):
         quantity_1, ingredient_1 = split_and_clean(row.get('Input #1', ''))
         quantity_2, ingredient_2 = split_and_clean(row.get('Input #2', ''))
 
         for i in range(1, 4):
-            q, n = split_and_clean(row.get(f'Output #{i}', ''))
-            if n:
-                processed_rows.append({
-                    'quantity_1': quantity_1,
-                    'ingredient_1': ingredient_1,
-                    'quantity_2': quantity_2,
-                    'ingredient_2': ingredient_2,
-                    'output_quantity': q,
-                    'output_item': n
-                })
+            output_quantity, output_item = split_and_clean(row.get(f'Output #{i}', ''))
+            if output_item:
+
+                input_pair = tuple(sorted([ingredient_1, ingredient_2]))
+                fusion_key = (input_pair[0], input_pair[1], output_item)
+
+                if fusion_key not in seen_combinations:
+                    seen_combinations.add(fusion_key)
+                    processed_rows.append({
+                        'quantity_1': quantity_1,
+                        'ingredient_1': ingredient_1,
+                        'quantity_2': quantity_2,
+                        'ingredient_2': ingredient_2,
+                        'output_quantity': output_quantity,
+                        'output_item': output_item
+                    })
+
     return processed_rows
 
 
