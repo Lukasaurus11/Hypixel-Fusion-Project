@@ -7,7 +7,7 @@ from typing import Dict, Tuple, List
 from polars import read_csv, DataFrame
 
 
-def fetch_and_process_information(filename: str = 'full_fusion_list.csv') -> List[Dict[str, int or str]]:
+def fetch_and_process_information(filename: str = 'Full Fusion List - Hypixel SkyBlock - List.csv') -> List[Dict[str, int or str]]:
     """
     Uses Polars for efficient CSV parsing and transformation.
     Extracts fusion data from a CSV and returns normalized list of records.
@@ -30,7 +30,7 @@ def fetch_and_process_information(filename: str = 'full_fusion_list.csv') -> Lis
         name = re_sub(r'\s*\(.*\)', '', parts[1]) if len(parts) > 1 else ''
         return quantity, name.strip()
 
-    df: DataFrame = read_csv(filename)
+    df: DataFrame = read_csv(filename, skip_rows=1)
 
     processed_rows: List = []
     for row in df.iter_rows(named=True):
