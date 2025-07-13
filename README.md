@@ -1,7 +1,7 @@
 ## Project to try to create a simple calculator for the Shard Fusion (introduced with the Foraging Update)
 
 The project builds on top of two files collected from the community + Bazaar data from the API itself.
-- `full_fusion_list.csv` [source](https://docs.google.com/spreadsheets/d/1yI5CLNYY2h_yzKaB0cFDUZQ_BdKQg8UUsjEDYCqV7Po/edit?usp=sharing): A CSV file containing all the fusion recipes. Credit to HsFearless, MaxLunar & WhatYouThing for the data. Sheet created by @lunaynx.
+- `Full Fusion List - Hypixel SkyBlock - List.csv` [source](https://docs.google.com/spreadsheets/d/1yI5CLNYY2h_yzKaB0cFDUZQ_BdKQg8UUsjEDYCqV7Po/edit?usp=sharing): A CSV file containing all the fusion recipes. Credit to HsFearless, MaxLunar & WhatYouThing for the data. Sheet created by @lunaynx.
 - `shards_cleaned.json` [source](https://github.com/Dazzlepuff/HypixelShardOptimizer/blob/main/shards_cleaned.json), although a version with a fixed typo can be found [here](https://github.com/Lukasaurus11/HypixelShardOptimizer/blob/main/shards_cleaned.json), contains all the relevant information for shards (as well as their Bazaar product IDs). Credit to Dazzlepuff for the data.
 - The Bazaar data can be obtained from the Hypixel API using the `fetch_info.py` directly, or executing the code from `main.py`. While having an API key is not necessary, it allows for more constant data updates.
   - Information about the Hypixel API can be found [here](https://api.hypixel.net/#tag/SkyBlock/paths/~1v2~1skyblock~1auctions_ended/get)
@@ -22,7 +22,23 @@ The project builds on top of two files collected from the community + Bazaar dat
    ```bash
    pip install -r requirements.txt
    ```
-3. Run the `main.py` file:
+3. Make sure you have the required files:
+   - `Full Fusion List - Hypixel SkyBlock - List.csv` in the same directory as the project.
+   - `shards_cleaned.json` in the same directory as the project.
+   - The structure of the project should look like this:
+   ```
+    .
+    ├── Full Fusion List - Hypixel SkyBlock - List.csv
+    ├── shards_cleaned.json
+    ├── main.py
+    ├── fetch_info.py
+    ├── calculate_profits.py
+    ├── build_database.py
+    ├── requirements.txt
+    ├── bazaar.json (will be created when running the project)
+    └── shard_recipes.db (will be created when running the project)
+    ```
+4. Run the `main.py` file:
    ```bash
     python main.py
     ```
