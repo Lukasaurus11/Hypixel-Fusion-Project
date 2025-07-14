@@ -1,5 +1,7 @@
 from json import dump as json_dump, load as json_load
 from os import getenv
+import sqlite3
+from sqlite3 import Connection, Cursor
 from typing import Dict
 
 from requests import get, Response
@@ -41,12 +43,17 @@ def json_to_dict(filename: str) -> Dict:
         return {}
 
 
-def get_bazaar_information() -> Dict[str, Dict[str, str or float or int]]:
+def get_bazaar_information(db_connection: Connection):
     """
-    This function makes a request to the Hypixel API to get the current Bazaar information.
+    Function to fetch and store Bazaar information and store in the database.
 
-    :return: The Bazaar information
+    :param db_connection: The SQLite database connection to store the Bazaar information.
+    :return: Nothing
     """
+
+    cursor: Cursor = db_connection.cursor()
+    cursor.execute("DROP TABLE IF EXISTS bazaar_info")
+
     hypixel_token: str = getenv('HYPIXEL_TOKEN')
     if not hypixel_token:
         response: Response = get('https://api.hypixel.net/v2/skyblock/bazaar')
@@ -64,10 +71,43 @@ def get_bazaar_information() -> Dict[str, Dict[str, str or float or int]]:
         for key in data.keys():
             data[key] = data[key]['quick_status']
 
-        dict_to_json(data, 'bazaar.json')
-        return data
+        cursor.execute("""
+                       CREATE TABLE IF NOT EXISTS bazaar_info
+                       (
+                           product_id       TEXT PRIMARY KEY,
+                           sell_price       REAL,
+                           sell_volume      INTEGER,
+                           sell_moving_week INTEGER,
+                           sell_orders      INTEGER,
+                           buy_price        REAL,
+                           buy_volume       INTEGER,
+                           buy_moving_week  INTEGER,
+                           buy_orders       INTEGER
+                       )
+                       """)
+
+        for product in data.values():
+            cursor.execute("""
+                INSERT OR REPLACE INTO bazaar_info (
+                    product_id, sell_price, sell_volume, sell_moving_week, sell_orders,
+                    buy_price, buy_volume, buy_moving_week, buy_orders
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                product['productId'],
+                product['sellPrice'],
+                product['sellVolume'],
+                product['sellMovingWeek'],
+                product['sellOrders'],
+                product['buyPrice'],
+                product['buyVolume'],
+                product['buyMovingWeek'],
+                product['buyOrders']
+            ))
+        db_connection.commit()
 
     else:
         print(f'An error occurred with the request\n'
               f'{response.status_code}')
-        return {}
+
+
+get_bazaar_information(sqlite3.connect('shard_recipes.db'))

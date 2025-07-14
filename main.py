@@ -1,6 +1,6 @@
 from json import dump as json_dump
 from os.path import exists
-from sqlite3 import connect as sqlite_connect
+from sqlite3 import connect as sqlite_connect, Connection
 
 from build_database import fetch_and_process_information, store_data_in_database
 from calculate_profits import calculate_accurate_profit, sort_resulting_data
@@ -17,9 +17,14 @@ else:
     shards_cleaned_data: dict = json_to_dict("shards_cleaned.json")
     store_data_in_database(rows, shards_cleaned_data)
 
-bazaar_data = get_bazaar_information()
+sqlite_connection: Connection = sqlite_connect('shard_recipes.db')
 
-data_to_save = calculate_accurate_profit(sqlite_connect('shard_recipes.db'), bazaar_data)
+bazaar_data = get_bazaar_information(sqlite_connection)
+
+data_to_save = calculate_accurate_profit(sqlite_connection, bazaar_data)
+
+sqlite_connection.close()
+
 data_to_save = sort_resulting_data(data_to_save, [0.4, 0.6])
 
 # Round all the floats to 2 decimal places

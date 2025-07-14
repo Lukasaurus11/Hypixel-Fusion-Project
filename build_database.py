@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from re import sub as re_sub
-from sqlite3 import connect
+from sqlite3 import connect, Connection, Cursor
 from typing import Dict, Tuple, List, Set
 
 from polars import read_csv, DataFrame
 
 
-def fetch_and_process_information(filename: str = 'Full Fusion List - Hypixel SkyBlock - List.csv') -> List[
-    Dict[str, int or str]]:
+def fetch_and_process_information(filename: str = 'Full Fusion List - Hypixel SkyBlock - List.csv') -> \
+        List[Dict[str, int or str]]:
     """
     Uses Polars for efficient CSV parsing and transformation.
     Extracts fusion data from a CSV and returns normalized list of records.
@@ -26,9 +26,9 @@ def fetch_and_process_information(filename: str = 'Full Fusion List - Hypixel Sk
         """
         if not value:
             return 0, ''
-        parts = value.split(' ', 1)
-        quantity = int(parts[0].replace('x', '')) if parts[0].replace('x', '').isdigit() else 0
-        name = re_sub(r'\s*\(.*\)', '', parts[1]) if len(parts) > 1 else ''
+        parts: List[str] = value.split(' ', 1)
+        quantity: int = int(parts[0].replace('x', '')) if parts[0].replace('x', '').isdigit() else 0
+        name: str = re_sub(r'\s*\(.*\)', '', parts[1]) if len(parts) > 1 else ''
         return quantity, name.strip()
 
     df: DataFrame = read_csv(filename, skip_rows=1)
@@ -44,8 +44,8 @@ def fetch_and_process_information(filename: str = 'Full Fusion List - Hypixel Sk
             output_quantity, output_item = split_and_clean(row.get(f'Output #{i}', ''))
             if output_item:
 
-                input_pair = tuple(sorted([ingredient_1, ingredient_2]))
-                fusion_key = (input_pair[0], input_pair[1], output_item)
+                input_pair: Tuple[str, ...] = tuple(sorted([ingredient_1, ingredient_2]))
+                fusion_key: Tuple[str, str, str] = (input_pair[0], input_pair[1], output_item)
 
                 if fusion_key not in seen_combinations:
                     seen_combinations.add(fusion_key)
@@ -75,15 +75,15 @@ def store_data_in_database(processed_rows: List[Dict[str, int or str]], cleaned_
     """
     db_path: str = 'shard_recipes.db'
 
-    conn = connect(db_path)
-    cur = conn.cursor()
+    conn: Connection = connect(db_path)
+    cur: Cursor = conn.cursor()
 
     cur.execute("DROP TABLE IF EXISTS shard_recipes")
     cur.execute("DROP TABLE IF EXISTS shard_to_productid")
     cur.execute("DROP TABLE IF EXISTS shard_recipes_processed")
 
     # Will be deprecated once I updated to using the correct JSON file.
-    name_corrections = {
+    name_corrections: Dict[str, str] = {
         'Sea Serpant': 'Sea Serpent',
         'Star Centry': 'Star Sentry'
     }
