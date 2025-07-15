@@ -3,14 +3,12 @@ from sqlite3 import Connection, Cursor
 from typing import Dict, List
 
 
-def calculate_accurate_profit(db_connection: Connection, skip_empty_orders: bool = True) -> \
-        Dict[str, Dict[str, str or float or List]]:
+def calculate_accurate_profit(db_connection: Connection, skip_empty_orders: bool = True) -> None:
     """
     Function to calculate the profit for each recipe based on the bazaar data.
 
     :param db_connection: The connection to the SQLite database containing the shard recipes.
     :param skip_empty_orders: If True, it skips recipes with empty insta buy orders for ingredients.
-    :return: Nested dictionary containing profit information for each recipe.
     """
     cursor: Cursor = db_connection.cursor()
     cursor.execute("""
@@ -28,12 +26,11 @@ def calculate_accurate_profit(db_connection: Connection, skip_empty_orders: bool
 
     cursor.execute("SELECT * FROM bazaar_info")
     bazaar_data: Dict[str, Dict[str, int or str or float]] = {row[0]: {
-        'buyPrice': row[1],
-        'sellPrice': row[2],
-        'buyOrders': row[3],
+        'sellPrice': row[1],
+        'sellVolume': row[2],
         'sellOrders': row[4],
-        'sellVolume': row[5],
-        'rarity': row[6]
+        'buyOrders': row[8],
+        'buyPrice': row[5]
     } for row in cursor.fetchall()}
 
     for idx, recipe in enumerate(recipes):
@@ -44,6 +41,8 @@ def calculate_accurate_profit(db_connection: Connection, skip_empty_orders: bool
             continue
 
         product_info = bazaar_data[output_item]
+
+        print(product_info) if output_item == "SHARD_STARBORN" else None
 
         ingredient_1_info: Dict[str, int or str or float] = bazaar_data.get(ingredient_1, {})
         ingredient_2_info: Dict[str, int or str or float] = bazaar_data.get(ingredient_2, {})
@@ -64,16 +63,18 @@ def calculate_accurate_profit(db_connection: Connection, skip_empty_orders: bool
 
         profit_data[idx] = {
             'output_item': output_item,
-            'demand': floor(product_info.get('sellVolume')),
+            'demand': floor(product_info['sellVolume']),
             'profit': floor(profit),
             'ingredients': [
                 {
                     'name': ingredient_1,
                     'amount': quantity_1,
+                    'cost': floor(cost_ingredient_1)
                 },
                 {
                     'name': ingredient_2,
                     'amount': quantity_2,
+                    'cost': floor(cost_ingredient_2)
                 }
             ]
         }
@@ -88,44 +89,53 @@ def calculate_accurate_profit(db_connection: Connection, skip_empty_orders: bool
                        output_item TEXT,
                        demand      REAL,
                        profit      REAL,
-                       ingredients TEXT
+                       ingredients TEXT,
+                       id          TEXT
                    )
                    ''')
 
     # Fetch the data from shard_to_productid to use those product names instead of the ID's
-    cursor.execute('''SELECT productID, name 
+    cursor.execute('''SELECT productID, name, rarity, craftingID
                       FROM shard_to_productid''')
-    product_names: Dict[str, str] = {row[0]: row[1] for row in cursor.fetchall()}
+    product_data: Dict[str, Dict[str, str]] = {
+        row[0]: {
+            'name': row[1],
+            'rarity': row[2],
+            'craftingID': row[3]
+        } for row in cursor.fetchall()
+    }
 
     # Update the output_item in profit_data with the product names
-    for idx, data in profit_data.items():
-        if data['output_item'] in product_names:
-            data['output_item'] = product_names[data['output_item']]
+    for _, data in profit_data.items():
+        product_information = product_data.get(data['output_item'], {})
+        data['ID'] = f"{str(product_information['rarity'])[0].upper()}{product_information['craftingID']}"
+
+        if data['output_item'] in product_data:
+            data['output_item'] = product_information['name']
         else:
             print(f"Warning: Output item {data['output_item']} not found in product names mapping.")
 
         for ingredient in data['ingredients']:
-            if ingredient['name'] in product_names:
-                ingredient['name'] = product_names[ingredient['name']]
+            if ingredient['name'] in product_data:
+                ingredient['name'] = product_data[ingredient['name']]['name']
             else:
                 print(f"Warning: Ingredient {ingredient['name']} not found in product names mapping.")
 
     cursor.executemany('''
-                       INSERT INTO shard_profit_data (recipe_id, output_item, demand, profit, ingredients)
-                       VALUES (?, ?, ?, ?, ?)
+                       INSERT INTO shard_profit_data (recipe_id, output_item, demand, profit, ingredients, id)
+                       VALUES (?, ?, ?, ?, ?, ?)
                        ''', [
                            (
                                idx,
                                data['output_item'],
                                data['demand'],
                                data['profit'],
-                               str(data['ingredients'])  # Convert list of dicts to string for storage
+                               str(data['ingredients']),
+                               data['ID']
                            )
                            for idx, data in profit_data.items()
                        ])
     db_connection.commit()
-
-    return profit_data
 
 
 def sort_resulting_data(data: Dict[str, Dict[str, str or float or List]], weights: List[float] = None) -> \

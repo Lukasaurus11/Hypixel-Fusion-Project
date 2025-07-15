@@ -64,6 +64,7 @@ def fetch_and_process_information(filename: str = 'Full Fusion List - Hypixel Sk
 def store_data_in_database(processed_rows: List[Dict[str, int or str]], cleaned_shards_data: Dict[str, int or str]):
     """
     Function to store processed rows and cleaned shards data into an SQLite database.
+    [OUTDATED info]
     It will make three tables:
         - `shard_to_productid`: Maps shard names to their product IDs and other relevant information.
         - `shard_recipes`: Contains the recipes for shards.
@@ -78,99 +79,106 @@ def store_data_in_database(processed_rows: List[Dict[str, int or str]], cleaned_
     conn: Connection = connect(db_path)
     cur: Cursor = conn.cursor()
 
-    cur.execute("DROP TABLE IF EXISTS shard_recipes")
-    cur.execute("DROP TABLE IF EXISTS shard_to_productid")
-    cur.execute("DROP TABLE IF EXISTS shard_recipes_processed")
+    def table_has_data(table_name: str) -> bool:
+        cur.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
+        if cur.fetchone():
+            cur.execute(f"SELECT 1 FROM {table_name} LIMIT 1")
+            return cur.fetchone() is not None
+        return False
 
-    # Will be deprecated once I updated to using the correct JSON file.
-    name_corrections: Dict[str, str] = {
-        'Sea Serpant': 'Sea Serpent',
-        'Star Centry': 'Star Sentry'
-    }
+    if not table_has_data('shard_to_productid'):
+        cur.execute('''
+                    CREATE TABLE IF NOT EXISTS shard_to_productid
+                    (
+                        name       TEXT PRIMARY KEY,
+                        productID  TEXT,
+                        rarity     TEXT,
+                        family     TEXT,
+                        craftingID TEXT
+                    )
+                    ''')
+        name_corrections: Dict[str, str] = {
+            'Sea Serpant': 'Sea Serpent',
+            'Star Centry': 'Star Sentry'
+        }
+        cur.executemany('''
+                        INSERT INTO shard_to_productid
+                            (name, productID, rarity, family, craftingID)
+                        VALUES (?, ?, ?, ?, ?)
+                        ''', [
+                            (
+                                name_corrections.get(name, name),
+                                info.get('productID'),
+                                info.get('rarity'),
+                                info.get('family')[0] if info.get('family') else None,
+                                info.get('id')
+                            )
+                            for name, info in cleaned_shards_data['shards'].items()
+                        ])
+        conn.commit()
 
-    cur.execute('''
-                CREATE TABLE shard_to_productid
-                (
-                    name       TEXT PRIMARY KEY,
-                    productID  TEXT,
-                    rarity     TEXT,
-                    family     TEXT,
-                    craftingID TEXT
-                )
-                ''')
-    cur.executemany('''
-                    INSERT INTO shard_to_productid
-                        (name, productID, rarity, family, craftingID)
-                    VALUES (?, ?, ?, ?, ?)
-                    ''', [
-                        (
-                            name_corrections.get(name, name),
-                            info.get('productID'),
-                            info.get('rarity'),
-                            info.get('family')[0] if info.get('family') else None,
-                            info.get('id')
-                        )
-                        for name, info in cleaned_shards_data['shards'].items()
-                    ])
-    conn.commit()
+    if not table_has_data('shard_recipes'):
+        cur.execute('''
+                    CREATE TABLE IF NOT EXISTS shard_recipes
+                    (
+                        quantity_1      INTEGER,
+                        ingredient_1    TEXT,
+                        quantity_2      INTEGER,
+                        ingredient_2    TEXT,
+                        output_quantity INTEGER,
+                        output_item     TEXT
+                    )
+                    ''')
+        cur.executemany('''
+                        INSERT INTO shard_recipes
+                        (quantity_1, ingredient_1, quantity_2, ingredient_2, output_quantity, output_item)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        ''', [
+                            (
+                                row['quantity_1'],
+                                row['ingredient_1'],
+                                row['quantity_2'],
+                                row['ingredient_2'],
+                                row['output_quantity'],
+                                row['output_item']
+                            )
+                            for row in processed_rows
+                        ])
+        conn.commit()
 
-    cur.execute('''
-                CREATE TABLE shard_recipes
-                (
-                    quantity_1      INTEGER,
-                    ingredient_1    TEXT,
-                    quantity_2      INTEGER,
-                    ingredient_2    TEXT,
-                    output_quantity INTEGER,
-                    output_item     TEXT
-                )
-                ''')
-    cur.executemany('''
-                    INSERT INTO shard_recipes
-                    (quantity_1, ingredient_1, quantity_2, ingredient_2, output_quantity, output_item)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    ''', [
-                        (
-                            row['quantity_1'],
-                            row['ingredient_1'],
-                            row['quantity_2'],
-                            row['ingredient_2'],
-                            row['output_quantity'],
-                            row['output_item']
-                        )
-                        for row in processed_rows
-                    ])
-    conn.commit()
+    if not table_has_data('shard_recipes_processed'):
+        cur.execute('''
+                    CREATE TABLE IF NOT EXISTS shard_recipes_processed
+                    (
+                        quantity_1      INTEGER,
+                        ingredient_1    TEXT,
+                        quantity_2      INTEGER,
+                        ingredient_2    TEXT,
+                        output_quantity INTEGER,
+                        output_item     TEXT
+                    )
+                    ''')
+        name_corrections: Dict[str, str] = {
+            'Sea Serpant': 'Sea Serpent',
+            'Star Centry': 'Star Sentry'
+        }
+        name_id_map = {name_corrections.get(info['name'], info['name']): info['productID'] for info in
+                       cleaned_shards_data['shards'].values()}
+        cur.executemany('''
+                        INSERT INTO shard_recipes_processed
+                        (quantity_1, ingredient_1, quantity_2, ingredient_2, output_quantity, output_item)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        ''', [
+                            (
+                                row['quantity_1'],
+                                name_id_map.get(row['ingredient_1'], row['ingredient_1']),
+                                row['quantity_2'],
+                                name_id_map.get(row['ingredient_2'], row['ingredient_2']),
+                                row['output_quantity'],
+                                name_id_map.get(row['output_item'], row['output_item'])
+                            )
+                            for row in processed_rows
+                        ])
+        conn.commit()
 
-    cur.execute('''
-                CREATE TABLE shard_recipes_processed
-                (
-                    quantity_1      INTEGER,
-                    ingredient_1    TEXT,
-                    quantity_2      INTEGER,
-                    ingredient_2    TEXT,
-                    output_quantity INTEGER,
-                    output_item     TEXT
-                )
-                ''')
-
-    name_id_map = {name_corrections.get(info['name'], info['name']): info['productID'] for info in
-                   cleaned_shards_data['shards'].values()}
-
-    cur.executemany('''
-                    INSERT INTO shard_recipes_processed
-                    (quantity_1, ingredient_1, quantity_2, ingredient_2, output_quantity, output_item)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    ''', [
-                        (
-                            row['quantity_1'],
-                            name_id_map.get(row['ingredient_1'], row['ingredient_1']),
-                            row['quantity_2'],
-                            name_id_map.get(row['ingredient_2'], row['ingredient_2']),
-                            row['output_quantity'],
-                            name_id_map.get(row['output_item'], row['output_item'])
-                        )
-                        for row in processed_rows
-                    ])
-    conn.commit()
     conn.close()

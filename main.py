@@ -1,35 +1,17 @@
-from json import dump as json_dump
-from os.path import exists
 from sqlite3 import connect as sqlite_connect, Connection
 
 from build_database import fetch_and_process_information, store_data_in_database
-from calculate_profits import calculate_accurate_profit, sort_resulting_data
+from calculate_profits import calculate_accurate_profit
 from fetch_info import get_bazaar_information, json_to_dict
 
-# Check to see if the database file exists
-if exists('shard_recipes.db'):
-    print('Database file already exists. Skipping database creation.')
+rows = fetch_and_process_information()
 
-else:
-    print('Database file does not exist. Proceeding with database creation.')
-    rows = fetch_and_process_information()
-
-    shards_cleaned_data: dict = json_to_dict("shards_cleaned.json")
-    store_data_in_database(rows, shards_cleaned_data)
+shards_cleaned_data: dict = json_to_dict("shards_cleaned.json")
+store_data_in_database(rows, shards_cleaned_data)
 
 sqlite_connection: Connection = sqlite_connect('shard_recipes.db')
 
 bazaar_data = get_bazaar_information(sqlite_connection)
 
-data_to_save = calculate_accurate_profit(sqlite_connection, bazaar_data)
-
+calculate_accurate_profit(sqlite_connection, bazaar_data)
 sqlite_connection.close()
-
-data_to_save = sort_resulting_data(data_to_save, [0.4, 0.6])
-
-# Round all the floats to 2 decimal places
-for key, value in data_to_save.items():
-    value['profit'] = round(value['profit'], 2)
-
-with open('shard_profits.json', 'w') as f:
-    json_dump(data_to_save, f, indent=4)
