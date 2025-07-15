@@ -41,9 +41,6 @@ def calculate_accurate_profit(db_connection: Connection, skip_empty_orders: bool
             continue
 
         product_info = bazaar_data[output_item]
-
-        print(product_info) if output_item == "SHARD_STARBORN" else None
-
         ingredient_1_info: Dict[str, int or str or float] = bazaar_data.get(ingredient_1, {})
         ingredient_2_info: Dict[str, int or str or float] = bazaar_data.get(ingredient_2, {})
 
