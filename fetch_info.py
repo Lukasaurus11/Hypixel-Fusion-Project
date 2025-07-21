@@ -108,6 +108,3 @@ def get_bazaar_information(db_connection: Connection):
     else:
         print(f'An error occurred with the request\n'
               f'{response.status_code}')
-
-
-get_bazaar_information(sqlite3.connect('shard_recipes.db'))

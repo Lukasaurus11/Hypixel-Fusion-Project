@@ -53,10 +53,7 @@ def calculate_accurate_profit(db_connection: Connection, skip_empty_orders: bool
 
         product_price: float = product_info.get('buyPrice')
 
-        if product_info.get('rarity') in ['Legendary', 'Mythic']:
-            profit: float = product_price - (cost_ingredient_1 + cost_ingredient_2)
-        else:
-            profit: float = (product_price * output_quantity) - (cost_ingredient_1 + cost_ingredient_2)
+        profit: float = (product_price * output_quantity) - (cost_ingredient_1 + cost_ingredient_2)
 
         profit_data[idx] = {
             'output_item': output_item,
@@ -73,7 +70,8 @@ def calculate_accurate_profit(db_connection: Connection, skip_empty_orders: bool
                     'amount': quantity_2,
                     'cost': floor(cost_ingredient_2)
                 }
-            ]
+            ],
+            'product_price': floor(product_price)
         }
 
     cursor.execute('''DROP TABLE IF EXISTS shard_profit_data''')
@@ -82,12 +80,13 @@ def calculate_accurate_profit(db_connection: Connection, skip_empty_orders: bool
     cursor.execute('''
                    CREATE TABLE IF NOT EXISTS shard_profit_data
                    (
-                       recipe_id   INTEGER PRIMARY KEY,
-                       output_item TEXT,
-                       demand      REAL,
-                       profit      REAL,
-                       ingredients TEXT,
-                       id          TEXT
+                       recipe_id     INTEGER PRIMARY KEY,
+                       output_item   TEXT,
+                       demand        REAL,
+                       profit        REAL,
+                       ingredients   TEXT,
+                       id            TEXT,
+                       current_price REAL
                    )
                    ''')
 
@@ -119,8 +118,9 @@ def calculate_accurate_profit(db_connection: Connection, skip_empty_orders: bool
                 print(f"Warning: Ingredient {ingredient['name']} not found in product names mapping.")
 
     cursor.executemany('''
-                       INSERT INTO shard_profit_data (recipe_id, output_item, demand, profit, ingredients, id)
-                       VALUES (?, ?, ?, ?, ?, ?)
+                       INSERT INTO shard_profit_data (recipe_id, output_item, demand, profit, ingredients, id,
+                                                      current_price)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)
                        ''', [
                            (
                                idx,
@@ -128,25 +128,9 @@ def calculate_accurate_profit(db_connection: Connection, skip_empty_orders: bool
                                data['demand'],
                                data['profit'],
                                str(data['ingredients']),
-                               data['ID']
+                               data['ID'],
+                               data['product_price']
                            )
                            for idx, data in profit_data.items()
                        ])
     db_connection.commit()
-
-
-def sort_resulting_data(data: Dict[str, Dict[str, str or float or List]], weights: List[float] = None) -> \
-        Dict[str, Dict[str, str or float or List]]:
-    """
-    Sort the resulting data by profit in descending order.
-
-    :param data: The data to be sorted.
-    :param weights: Weights for sorting criteria (first one for the weight profit and then for the buy order values).
-    :return: Sorted data.
-    """
-
-    if weights is None:
-        weights = [1.0, 0.0]
-
-    return dict(sorted(data.items(), key=lambda item: (
-            item[1]['profit'] * weights[0] + item[1]['demand'] * weights[1]), reverse=True))
