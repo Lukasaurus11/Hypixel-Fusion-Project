@@ -1,69 +1,165 @@
-## Project to try to create a simple calculator for the Shard Fusion (introduced with the Foraging Update)
+# Hypixel SkyBlock Shard Fusion Profit Calculator
 
-The project builds on top of two files collected from the community + Bazaar data from the API itself.
--
-`Full Fusion List - Hypixel SkyBlock - List.csv` [source](https://docs.google.com/spreadsheets/d/1yI5CLNYY2h_yzKaB0cFDUZQ_BdKQg8UUsjEDYCqV7Po/edit?usp=sharing):
-A CSV file containing all the fusion recipes. Credit to HsFearless, MaxLunar & WhatYouThing for the data. Sheet created
-by @lunaynx.
+A modern web application for calculating the most profitable shard fusion recipes in Hypixel SkyBlock, featuring real-time bazaar data and an intuitive interface.
 
-- `shards_cleaned.json` [source](https://github.com/Dazzlepuff/HypixelShardOptimizer/blob/main/shards_cleaned.json),
-  although a version with a fixed typo can be
-  found [here](https://github.com/Lukasaurus11/HypixelShardOptimizer/blob/main/shards_cleaned.json), contains all the
-  relevant information for shards (as well as their Bazaar product IDs). Credit to Dazzlepuff for the data.
-- The Bazaar data can be obtained from the Hypixel API using the `fetch_info.py` directly, or executing the code from
-  `main.py`. While having an API key is not necessary, it allows for more constant data updates.
-    - Information about the Hypixel API can be
-      found [here](https://api.hypixel.net/#tag/SkyBlock/paths/~1v2~1skyblock~1auctions_ended/get)
-    - To generate an API key, you can get them [here](https://developer.hypixel.net/)
+## Features
 
-### Project structure
+- **Real-time Profit Calculations**: Automatically calculates profit margins for all shard fusion recipes using live bazaar data
+- **Interactive Web Interface**: Modern Next.js frontend with responsive design
+- **Price History Tracking**: Monitor price trends over time for better trading decisions
+- **Automatic Data Updates**: Background refresh of bazaar prices and profit calculations
+- **Comprehensive Recipe Database**: All fusion recipes from community-sourced data
+- **Sorting & Filtering**: Find the most profitable recipes quickly
 
-- `main.py`: The main file that runs the program. It will build the database if necessary, fetch the Bazaar data, and
-  then generate the JSON with the calculations.
-- `fetch_info.py`: A file that fetches the Bazaar data from the Hypixel API and saves it to a JSON file as well as
-  containing a helper function to load JSON files.
-- `calculate_profits.py`: A file that will calculate and return all the profits for each of the recipes registered in
-  the database. It returns the information as a dictionary for ease of processing.
-- `build_database.py`: A file that builds the database from the CSV and JSON files. It will create an SQLite database
-  with all the relevant information with three relevant tables:
-    - `shard_recipes`: Contains the recipes for the shards gathered directly from the CSV file (Currently might contain
-      some duplicates).
-    - `shard_to_productid`: Contains processed information about the shards gathered only from the `shards_cleaned.json`
-      file.
-    - `shard_recipes_processed`: Contains the recipe information processed to use the Bazaar product IDs instead of the
-      shard names. This is used to calculate the prices of the shards.
+## Architecture
 
-### How to run the project
+### Frontend (Active Development)
 
-1. Make sure you have Pyton 3.9 or higher installed.
-2. Install the required packages by running:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Make sure you have the required files:
-    - `Full Fusion List - Hypixel SkyBlock - List.csv` in the same directory as the project.
-    - `shards_cleaned.json` in the same directory as the project.
-    - The structure of the project should look like this:
-   ```
-    |
-    ├── Full Fusion List - Hypixel SkyBlock - List.csv
-    ├── shards_cleaned.json
-    ├── main.py
-    ├── fetch_info.py
-    ├── calculate_profits.py
-    ├── build_database.py
-    ├── requirements.txt
-    ├── bazaar.json (will be created when running the project -> no longer will be created)
-    └── shard_recipes.db (will be created when running the project)
-    ```
-4. Run the `main.py` file:
-   ```bash
-    python main.py
-    ```
+- **Next.js 14** with TypeScript
+- **Tailwind CSS** for styling
+- **SQLite** database with better-sqlite3
+- Real-time API endpoints for data fetching
+- Responsive design with modern UI components
 
-### Tasks TODO or in progress
+### Backend (Legacy/Utilities)
 
-- [x] Move from JSON to SQLite for Bazaar data.
-- [x] Move from JSON to SQLite for Shard Profits while keeping a temporary JSON file as the output.
-- [ ] Add a frontend to display the information as reading JSON files ain't pretty (partially done but still working on
-  it).
+- **Python scripts** for data processing and database initialization
+- Original calculation logic (now ported to TypeScript)
+- Utility scripts for data migration and batch processing
+
+## Installation & Setup
+
+### Prerequisites
+
+- Node.js 18+
+- Python 3.9+ (for legacy scripts)
+
+### Frontend Setup (Recommended)
+
+```bash
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+The application will be available at `http://localhost:3000`
+
+### Database Initialization (First Time Setup)
+
+If you need to initialize the database from scratch:
+
+```bash
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Run the database builder (creates shard_recipes.db)
+python build_database.py
+```
+
+## Project Structure
+
+```
+hypixel-fusion-project/
+├── frontend/                   # Next.js application (main)
+│   ├── app/
+│   │   ├── api/               # API endpoints
+│   │   │   ├── items/         # Get recipe data
+│   │   │   ├── update-data/   # Refresh bazaar data
+│   │   │   └── price-history/ # Historical pricing
+│   │   ├── components/        # React components
+│   │   ├── lib/              # Utility functions
+│   │   └── page.tsx          # Main page
+│   ├── data/                 # SQLite database
+│   └── public/               # Static assets (shard icons)
+│
+├── backend/ (legacy)         # Python scripts
+│   ├── build_database.py    # Database initialization
+│   ├── calculate_profits.py # Profit calculations
+│   ├── fetch_info.py        # Bazaar data fetching
+│   └── main.py              # Legacy orchestrator
+│
+├── data/                    # Source data files
+│   ├── Full Fusion List.csv # Community fusion recipes
+│   └── shards_cleaned.json  # Shard metadata
+│
+└── README.md
+```
+
+## Usage
+
+1. **Start the application**: `cd frontend && npm run dev` (or `cd frontend; npm run dev` in Windows)
+2. **View recipes**: Browse all available fusion recipes sorted by profit
+3. **Update data**: Click the refresh button or use the `/api/update-data` endpoint
+4. **Monitor trends**: Check price history for market timing
+
+## 📊 API Endpoints
+
+- `GET /api/items` - Fetch all recipes with profit calculations
+- `POST /api/update-data` - Refresh bazaar data and recalculate profits
+- `GET /api/last-update` - Get timestamp of last data update
+- `GET /api/price-history/:productId` - Get price history for a specific item
+
+## Development
+
+### Adding New Features
+
+1. Frontend development in `frontend/app/`
+2. API endpoints in `frontend/app/api/`
+3. Utility functions in `frontend/app/lib/`
+
+### Database Schema
+
+- `shard_recipes` - Raw fusion recipes from CSV
+- `shard_to_productid` - Shard metadata and bazaar IDs
+- `shard_recipes_processed` - Recipes with bazaar IDs for calculations
+- `bazaar_info` - Current bazaar prices
+- `shard_profit_data` - Calculated profit data
+- `product_price_history` - Historical pricing data
+
+## Environment Variables
+
+Create a `.env.local` file in the frontend directory:
+
+```env
+HYPIXEL_TOKEN=your_hypixel_api_key_here  # Optional but recommended
+```
+
+## Credits & Data Sources
+
+- **Fusion Recipes**: [Community Spreadsheet](https://docs.google.com/spreadsheets/d/1yI5CLNYY2h_yzKaB0cFDUZQ_BdKQg8UUsjEDYCqV7Po/edit?usp=sharing)
+  - Credit to HsFearless, MaxLunar & WhatYouThing for data collection
+  - Sheet created by @lunaynx
+- **Shard Metadata**: [HypixelShardOptimizer](https://github.com/Dazzlepuff/HypixelShardOptimizer) by Dazzlepuff (Check this fork for an updated version of the data [here](https://github.com/Lukasaurus11/HypixelShardOptimizer))
+- **Bazaar Data**: [Hypixel SkyBlock API](https://api.hypixel.net)
+- **Price History**: [Coflnet API](https://sky.coflnet.com)
+
+## 🔧 Legacy Python Scripts
+
+The Python scripts in the root directory are legacy tools that have been ported to TypeScript in the frontend. They can still be used for:
+
+- Database initialization from scratch
+- Batch data processing
+- Development and testing
+
+To use legacy scripts:
+
+```bash
+pip install -r requirements.txt
+python main.py
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit issues and pull requests.
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+
+---
