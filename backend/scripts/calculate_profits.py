@@ -3,7 +3,7 @@ from sqlite3 import Connection, Cursor
 from typing import Dict, List
 
 
-def calculate_accurate_profit(db_connection: Connection, skip_empty_orders: bool = True) -> None:
+def calculate_accurate_profit(db_connection: Connection, skip_empty_orders: bool = True, cope_mode: bool = False) -> None:
     """
     Function to calculate the profit for each recipe based on the bazaar data.
 
@@ -33,6 +33,12 @@ def calculate_accurate_profit(db_connection: Connection, skip_empty_orders: bool
         'buyPrice': row[5]
     } for row in cursor.fetchall()}
 
+    # Get product family data for COPE calculations if needed
+    family_data: Dict[str, str] = {}
+    if cope_mode:
+        cursor.execute("SELECT productID, family FROM shard_to_productid")
+        family_data = {row[0]: row[1] for row in cursor.fetchall()}
+
     for idx, recipe in enumerate(recipes):
         quantity_1, ingredient_1, quantity_2, ingredient_2, output_quantity, output_item = recipe
 
@@ -53,7 +59,17 @@ def calculate_accurate_profit(db_connection: Connection, skip_empty_orders: bool
 
         product_price: float = product_info.get('buyPrice')
 
-        profit: float = (product_price * output_quantity) - (cost_ingredient_1 + cost_ingredient_2)
+        # Apply COPE mode bonus if enabled and reptile shards are present
+        revenue: float = product_price * output_quantity
+        if cope_mode:
+            ingredient_1_is_reptile = family_data.get(ingredient_1) == "Reptile"
+            ingredient_2_is_reptile = family_data.get(ingredient_2) == "Reptile"
+            
+            if ingredient_1_is_reptile or ingredient_2_is_reptile:
+                # Multiply revenue by 1.2 because reptile shards have 20% chance to double output
+                revenue = revenue * 1.2
+
+        profit: float = revenue - (cost_ingredient_1 + cost_ingredient_2)
 
         profit_data[idx] = {
             'output_item': output_item,

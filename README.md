@@ -97,6 +97,17 @@ hypixel-fusion-project/
 3. **Update data**: Click the refresh button or use the `/api/update-data` endpoint
 4. **Monitor trends**: Check price history for market timing
 
+### COPE Mode Toggle
+
+The application features a **Boring/Cope** toggle switch that affects profit calculations:
+
+- **Boring Mode** (Default): Standard profit calculations using current bazaar prices
+- **Cope Mode**: Enhanced calculations that account for the 20% chance of reptile shards to double fusion output
+
+When **Cope Mode** is enabled, recipes containing reptile family shards will show increased revenue (multiplied by 1.2) to reflect the expected value from the doubling chance. This helps you make more informed decisions when working with reptile shards like those from the Reptile family.
+
+_Toggle between modes using the switch in the top-left corner of the interface._
+
 ## 📊 API Endpoints
 
 - `GET /api/items` - Fetch all recipes with profit calculations

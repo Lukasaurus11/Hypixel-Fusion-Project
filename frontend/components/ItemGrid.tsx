@@ -40,6 +40,8 @@ interface ToolbarProps {
   currentSort: SortOption;
   showCustomModal: boolean;
   setShowCustomModal: (show: boolean) => void;
+  copeMode: boolean;
+  onCopeToggle: (enabled: boolean) => void;
 }
 
 const Toolbar = ({
@@ -49,6 +51,8 @@ const Toolbar = ({
   currentSort,
   showCustomModal,
   setShowCustomModal,
+  copeMode,
+  onCopeToggle,
 }: ToolbarProps) => {
   const [profitWeight, setProfitWeight] = useState<string>("1");
   const [demandWeight, setDemandWeight] = useState<string>("1");
@@ -143,6 +147,39 @@ const Toolbar = ({
 
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => onCopeToggle(!copeMode)}
+              className="relative bg-gray-700 rounded-full p-0.5 border border-gray-600 w-32 h-9 hover:bg-gray-600 transition-colors"
+            >
+              {/* Sliding indicator */}
+              <div
+                className={`absolute top-0.5 left-0.5 w-[60px] h-8 bg-emerald-400 rounded-full shadow-sm transition-transform duration-200 ease-in-out ${
+                  copeMode ? "translate-x-[62px]" : "translate-x-0"
+                }`}
+              />
+
+              {/* Text labels */}
+              <div className="relative flex h-full text-sm font-medium">
+                <div className="w-[62px] flex items-center justify-center relative z-10">
+                  <span
+                    className={`transition-colors duration-200 ${
+                      !copeMode ? "text-black" : "text-gray-300"
+                    }`}
+                  >
+                    Boring
+                  </span>
+                </div>
+                <div className="w-[62px] flex items-center justify-center relative z-10">
+                  <span
+                    className={`transition-colors duration-200 ${
+                      copeMode ? "text-black" : "text-gray-300"
+                    }`}
+                  >
+                    Cope
+                  </span>
+                </div>
+              </div>
+            </button>
             <span className="text-gray-400">Sort by:</span>
             <select
               className="h-9 px-3 bg-gray-700 text-gray-200 rounded-md border border-gray-600 focus:outline-none focus:border-gray-500"
@@ -686,15 +723,50 @@ export default function ItemGrid({ items }: ItemGridProps) {
   });
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [copeMode, setCopeMode] = useState(false);
+  const [copeItems, setCopeItems] = useState<Item[]>([]);
+  const [loadingCope, setLoadingCope] = useState(false);
+
+  // Fetch COPE-adjusted items when COPE mode is toggled
+  useEffect(() => {
+    const fetchCopeItems = async () => {
+      if (copeMode) {
+        setLoadingCope(true);
+        try {
+          const response = await fetch("/api/items-cope");
+          const data = await response.json();
+          if (data.error) {
+            console.error("Error fetching COPE items:", data.error);
+            return;
+          }
+          // Convert grouped items to flat array
+          const flatItems = Object.values(data.items).flat() as Item[];
+          setCopeItems(flatItems);
+        } catch (error) {
+          console.error("Error fetching COPE items:", error);
+        } finally {
+          setLoadingCope(false);
+        }
+      }
+    };
+
+    fetchCopeItems();
+  }, [copeMode]);
+
+  // Use COPE items if COPE mode is enabled, otherwise use regular items
+  const currentItems = copeMode ? copeItems : items;
 
   // Group items by output_item
-  const itemsByOutput = items.reduce((acc: { [key: string]: Item[] }, item) => {
-    if (!acc[item.output_item]) {
-      acc[item.output_item] = [];
-    }
-    acc[item.output_item].push(item);
-    return acc;
-  }, {});
+  const itemsByOutput = currentItems.reduce(
+    (acc: { [key: string]: Item[] }, item) => {
+      if (!acc[item.output_item]) {
+        acc[item.output_item] = [];
+      }
+      acc[item.output_item].push(item);
+      return acc;
+    },
+    {}
+  );
 
   // Get the most profitable recipe for each output_item
   const bestRecipes = Object.values(itemsByOutput).map((recipes) =>
@@ -751,7 +823,14 @@ export default function ItemGrid({ items }: ItemGridProps) {
         currentSort={sortOption}
         showCustomModal={showCustomModal}
         setShowCustomModal={setShowCustomModal}
+        copeMode={copeMode}
+        onCopeToggle={setCopeMode}
       />
+      {loadingCope && (
+        <div className="text-center text-gray-300 mb-4">
+          Loading COPE calculations...
+        </div>
+      )}
       <div className="grid grid-cols-5 gap-2">
         {filteredAndSortedRecipes.map((item) => (
           <ItemCard

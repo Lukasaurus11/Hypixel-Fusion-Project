@@ -42,6 +42,7 @@ export interface ProductInfo {
   name: string;
   rarity: string;
   craftingID: string;
+  family: string;
 }
 
 export interface ProductData {

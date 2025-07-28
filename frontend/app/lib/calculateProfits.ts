@@ -3,7 +3,8 @@ import Database from "better-sqlite3";
 
 export function calculateAccurateProfit(
   db: Database.Database,
-  skipEmptyOrders: boolean = true
+  skipEmptyOrders: boolean = true,
+  copeMode: boolean = false
 ): void {
   try {
     const recipes = db
@@ -25,13 +26,33 @@ export function calculateAccurateProfit(
 
     // Get bazaar data
     const bazaarRows = db.prepare("SELECT * FROM bazaar_info").all();
-    const bazaarData = bazaarRows.reduce((acc: any, row) => {
+    const bazaarData = bazaarRows.reduce((acc: any, row: any) => {
       acc[row.product_id] = {
         sellPrice: row.sell_price,
         sellVolume: row.sell_volume,
         sellOrders: row.sell_orders,
         buyOrders: row.buy_orders,
         buyPrice: row.buy_price,
+      };
+      return acc;
+    }, {});
+
+    // Get product mapping data for family checking
+    const productRows = db
+      .prepare(
+        `
+      SELECT productID, name, rarity, craftingID, family
+      FROM shard_to_productid
+    `
+      )
+      .all();
+
+    const productData = productRows.reduce((acc: ProductData, row: any) => {
+      acc[row.productID] = {
+        name: row.name,
+        rarity: row.rarity,
+        craftingID: row.craftingID,
+        family: row.family,
       };
       return acc;
     }, {});
@@ -47,16 +68,16 @@ export function calculateAccurateProfit(
         output_item,
       } = recipe;
 
-      if (!bazaarData[output_item]) {
+      if (!(bazaarData as any)[output_item]) {
         console.log(
           `Output item ${output_item} not found in bazaar data. Skipping this recipe.`
         );
         return;
       }
 
-      const productInfo = bazaarData[output_item];
-      const ingredient1Info = bazaarData[ingredient_1] || {};
-      const ingredient2Info = bazaarData[ingredient_2] || {};
+      const productInfo = (bazaarData as any)[output_item];
+      const ingredient1Info = (bazaarData as any)[ingredient_1] || {};
+      const ingredient2Info = (bazaarData as any)[ingredient_2] || {};
 
       if (
         skipEmptyOrders &&
@@ -71,8 +92,22 @@ export function calculateAccurateProfit(
       const costIngredient1 = ingredient1Info.buyPrice * quantity_1;
       const costIngredient2 = ingredient2Info.buyPrice * quantity_2;
       const productPrice = productInfo.buyPrice;
-      const profit =
-        productPrice * output_quantity - (costIngredient1 + costIngredient2);
+
+      // Apply COPE mode bonus if enabled and reptile shards are present
+      let revenue = productPrice * output_quantity;
+      if (copeMode) {
+        const ingredient1IsReptile =
+          productData[ingredient_1]?.family === "Reptile";
+        const ingredient2IsReptile =
+          productData[ingredient_2]?.family === "Reptile";
+
+        if (ingredient1IsReptile || ingredient2IsReptile) {
+          // Multiply revenue by 1.2 because reptile shards have 20% chance to double output
+          revenue = revenue * 1.2;
+        }
+      }
+
+      const profit = revenue - (costIngredient1 + costIngredient2);
 
       profitData[idx] = {
         output_item,
@@ -111,24 +146,7 @@ export function calculateAccurateProfit(
     `
     ).run();
 
-    // Get product mapping data
-    const productRows = db
-      .prepare(
-        `
-      SELECT productID, name, rarity, craftingID
-      FROM shard_to_productid
-    `
-      )
-      .all();
-
-    const productData = productRows.reduce((acc: ProductData, row) => {
-      acc[row.productID] = {
-        name: row.name,
-        rarity: row.rarity,
-        craftingID: row.craftingID,
-      };
-      return acc;
-    }, {});
+    // Product data is already loaded above for COPE calculations
 
     // Update names and IDs
     Object.entries(profitData).forEach(([idx, data]) => {
