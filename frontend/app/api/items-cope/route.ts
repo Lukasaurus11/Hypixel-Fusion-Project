@@ -18,6 +18,7 @@ export async function GET() {
         output_item,
         demand,
         profit,
+        cost,
         ingredients,
         id
       FROM shard_profit_data

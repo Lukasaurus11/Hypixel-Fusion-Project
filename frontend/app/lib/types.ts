@@ -33,9 +33,15 @@ export interface ProfitData {
   output_item: string;
   demand: number;
   profit: number;
+  cost: number;
   ingredients: Ingredient[];
   product_price: number;
   ID: string;
+}
+
+export interface PriceSettings {
+  ingredientPriceType: "buyPrice" | "sellPrice";
+  outputPriceType: "buyPrice" | "sellPrice";
 }
 
 export interface ProductInfo {

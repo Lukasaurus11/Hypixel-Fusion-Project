@@ -1,10 +1,20 @@
-import { Recipe, ProfitData, ProductData, Ingredient } from "./types";
+import {
+  Recipe,
+  ProfitData,
+  ProductData,
+  Ingredient,
+  PriceSettings,
+} from "./types";
 import Database from "better-sqlite3";
 
 export function calculateAccurateProfit(
   db: Database.Database,
   skipEmptyOrders: boolean = true,
-  copeMode: boolean = false
+  copeMode: boolean = false,
+  priceSettings: PriceSettings = {
+    ingredientPriceType: "buyPrice",
+    outputPriceType: "buyPrice",
+  }
 ): void {
   try {
     const recipes = db
@@ -83,15 +93,14 @@ export function calculateAccurateProfit(
         skipEmptyOrders &&
         (ingredient1Info.buyOrders === 0 || ingredient2Info.buyOrders === 0)
       ) {
-        console.log(
-          `Skipping recipe ${idx} for ${output_item} due to empty buy orders for ingredients.`
-        );
         return;
       }
 
-      const costIngredient1 = ingredient1Info.buyPrice * quantity_1;
-      const costIngredient2 = ingredient2Info.buyPrice * quantity_2;
-      const productPrice = productInfo.buyPrice;
+      const costIngredient1 =
+        ingredient1Info[priceSettings.ingredientPriceType] * quantity_1;
+      const costIngredient2 =
+        ingredient2Info[priceSettings.ingredientPriceType] * quantity_2;
+      const productPrice = productInfo[priceSettings.outputPriceType];
 
       // Apply COPE mode bonus if enabled and reptile shards are present
       let revenue = productPrice * output_quantity;
@@ -108,11 +117,13 @@ export function calculateAccurateProfit(
       }
 
       const profit = revenue - (costIngredient1 + costIngredient2);
+      const totalCost = costIngredient1 + costIngredient2;
 
       profitData[idx] = {
         output_item,
         demand: Math.floor(productInfo.sellVolume),
         profit: Math.floor(profit),
+        cost: Math.floor(totalCost),
         ingredients: [
           {
             name: ingredient_1,
@@ -139,6 +150,7 @@ export function calculateAccurateProfit(
         output_item TEXT,
         demand REAL,
         profit REAL,
+        cost REAL,
         ingredients TEXT,
         id TEXT,
         current_price REAL
@@ -176,8 +188,8 @@ export function calculateAccurateProfit(
     // Insert profit data
     const insertStmt = db.prepare(`
       INSERT INTO shard_profit_data (
-        recipe_id, output_item, demand, profit, ingredients, id, current_price
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        recipe_id, output_item, demand, profit, cost, ingredients, id, current_price
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     // Use a transaction for better performance
@@ -188,6 +200,7 @@ export function calculateAccurateProfit(
           data.output_item,
           data.demand,
           data.profit,
+          data.cost,
           JSON.stringify(data.ingredients),
           data.ID,
           data.product_price

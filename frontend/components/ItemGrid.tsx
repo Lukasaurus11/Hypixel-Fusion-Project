@@ -33,6 +33,11 @@ interface CustomWeights {
   demand: number;
 }
 
+interface PriceSettings {
+  ingredientPriceType: "buyPrice" | "sellPrice";
+  outputPriceType: "buyPrice" | "sellPrice";
+}
+
 interface ToolbarProps {
   onSortChange: (option: SortOption) => void;
   onCustomWeightsChange: (weights: CustomWeights) => void;
@@ -42,6 +47,9 @@ interface ToolbarProps {
   setShowCustomModal: (show: boolean) => void;
   copeMode: boolean;
   onCopeToggle: (enabled: boolean) => void;
+  priceSettings: PriceSettings;
+  onPriceSettingsChange: (settings: PriceSettings) => void;
+  onDataRefresh?: (priceSettings: PriceSettings) => Promise<void>;
 }
 
 const Toolbar = ({
@@ -53,15 +61,22 @@ const Toolbar = ({
   setShowCustomModal,
   copeMode,
   onCopeToggle,
+  priceSettings,
+  onPriceSettingsChange,
+  onDataRefresh,
 }: ToolbarProps) => {
   const [profitWeight, setProfitWeight] = useState<string>("1");
   const [demandWeight, setDemandWeight] = useState<string>("1");
+  const [showPriceModal, setShowPriceModal] = useState(false);
+  const [tempPriceSettings, setTempPriceSettings] =
+    useState<PriceSettings>(priceSettings);
+  const [isApplyingSettings, setIsApplyingSettings] = useState(false);
 
-  // Add effect to prevent background scroll when custom modal is open
+  // Add effect to prevent background scroll when modals are open
   useEffect(() => {
     const hasScrollbar =
       document.documentElement.scrollHeight > window.innerHeight;
-    if (showCustomModal) {
+    if (showCustomModal || showPriceModal) {
       document.body.classList.add("modal-open");
       if (hasScrollbar) {
         document.body.style.paddingRight = "17px";
@@ -70,7 +85,12 @@ const Toolbar = ({
       document.body.classList.remove("modal-open");
       document.body.style.paddingRight = "0";
     }
-  }, [showCustomModal]);
+  }, [showCustomModal, showPriceModal]);
+
+  // Update temp settings when price settings change
+  useEffect(() => {
+    setTempPriceSettings(priceSettings);
+  }, [priceSettings]);
 
   // Set initial weights based on current sort when modal opens
   const setInitialWeights = (sortType: SortOption) => {
@@ -130,23 +150,49 @@ const Toolbar = ({
     setShowCustomModal(false);
   };
 
+  const handlePriceSettingsSubmit = async () => {
+    setIsApplyingSettings(true);
+    onPriceSettingsChange(tempPriceSettings);
+
+    // Trigger data refresh with new price settings
+    if (onDataRefresh) {
+      try {
+        await onDataRefresh(tempPriceSettings);
+      } catch (error) {
+        console.error("Error refreshing data with new price settings:", error);
+        alert("Failed to refresh data with new settings. Please try again.");
+      }
+    }
+
+    setIsApplyingSettings(false);
+    setShowPriceModal(false);
+  };
+
+  const resetPriceSettings = () => {
+    setTempPriceSettings(priceSettings);
+    setShowPriceModal(false);
+  };
+
   return (
     <div className="mb-6">
       <div className="flex justify-between items-center bg-gray-900 p-2 border-b border-gray-700">
-        <div className="flex items-center gap-2">
-          <button className="h-9 px-4 bg-gray-800 text-gray-200 rounded-md border border-gray-700 hover:bg-gray-700 transition-colors">
-            Shard Profits
-          </button>
-          <button
-            className="h-9 px-4 text-gray-400 rounded-md hover:bg-gray-800 transition-colors"
-            disabled
-          >
-            Coming soon...
-          </button>
-        </div>
-
+        {/* Left side - Tabs and COPE toggle */}
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
+            <button className="h-9 px-4 bg-gray-800 text-gray-200 rounded-md border border-gray-700 hover:bg-gray-700 transition-colors">
+              Shard Profits
+            </button>
+            <button
+              className="h-9 px-4 text-gray-400 rounded-md hover:bg-gray-800 transition-colors"
+              disabled
+            >
+              Coming soon...
+            </button>
+          </div>
+
+          {/* COPE Toggle */}
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400 text-sm">Mode:</span>
             <button
               onClick={() => onCopeToggle(!copeMode)}
               className="relative bg-gray-700 rounded-full p-0.5 border border-gray-600 w-32 h-9 hover:bg-gray-600 transition-colors"
@@ -180,6 +226,12 @@ const Toolbar = ({
                 </div>
               </div>
             </button>
+          </div>
+        </div>
+
+        {/* Right side - Sort, Search, and Price Settings */}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
             <span className="text-gray-400">Sort by:</span>
             <select
               className="h-9 px-3 bg-gray-700 text-gray-200 rounded-md border border-gray-600 focus:outline-none focus:border-gray-500"
@@ -203,15 +255,24 @@ const Toolbar = ({
             )}
           </div>
 
-          <div className="relative">
+          <div className="flex items-center gap-2">
+            <span className="text-gray-400">Search:</span>
             <input
               type="text"
               placeholder="Search items..."
+              className="h-9 px-3 bg-gray-700 text-gray-200 rounded-md border border-gray-600 focus:outline-none focus:border-gray-500"
               onChange={(e) => onSearchChange(e.target.value)}
-              className="h-9 pl-9 pr-3 bg-gray-700 text-gray-200 rounded-md border border-gray-600 focus:outline-none focus:border-gray-500 w-64"
             />
+          </div>
+
+          {/* Price Settings Button */}
+          <button
+            onClick={() => setShowPriceModal(true)}
+            className="h-9 px-3 bg-gray-700 text-gray-200 rounded-md border border-gray-600 hover:bg-gray-600 transition-colors flex items-center gap-2"
+            title="Price Settings"
+          >
             <svg
-              className="absolute left-3 top-2.5 h-4 w-4 text-gray-400"
+              className="w-4 h-4"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -220,22 +281,49 @@ const Toolbar = ({
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
               />
             </svg>
-          </div>
+            <span>Prices</span>
+          </button>
         </div>
       </div>
 
+      {/* Custom Weights Modal */}
       {showCustomModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-800 rounded-lg p-6 w-96">
-            <h2 className="text-lg font-semibold text-gray-200 mb-4">
-              Custom Weights
-            </h2>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-200">
+                Custom Sort Weights
+              </h3>
+              <button
+                onClick={() => setShowCustomModal(false)}
+                className="text-gray-400 hover:text-gray-200"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+            </div>
+
             <div className="space-y-4">
               <div>
-                <label className="block text-gray-400 mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Profit Weight
                 </label>
                 <input
@@ -244,21 +332,13 @@ const Toolbar = ({
                   onChange={(e) =>
                     handleInputChange(e.target.value, setProfitWeight)
                   }
-                  onBlur={() => {
-                    if (
-                      profitWeight.trim() === "" &&
-                      demandWeight.trim() === ""
-                    ) {
-                      setProfitWeight("1");
-                      setDemandWeight("0");
-                    }
-                  }}
-                  className="w-full h-9 px-3 bg-gray-700 text-gray-200 rounded-md border border-gray-600"
-                  placeholder="Enter a number"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 focus:outline-none focus:border-gray-500"
+                  placeholder="e.g., 1"
                 />
               </div>
+
               <div>
-                <label className="block text-gray-400 mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Demand Weight
                 </label>
                 <input
@@ -267,37 +347,176 @@ const Toolbar = ({
                   onChange={(e) =>
                     handleInputChange(e.target.value, setDemandWeight)
                   }
-                  onBlur={() => {
-                    if (
-                      profitWeight.trim() === "" &&
-                      demandWeight.trim() === ""
-                    ) {
-                      setProfitWeight("1");
-                      setDemandWeight("0");
-                    }
-                  }}
-                  className="w-full h-9 px-3 bg-gray-700 text-gray-200 rounded-md border border-gray-600"
-                  placeholder="Enter a number"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 focus:outline-none focus:border-gray-500"
+                  placeholder="e.g., 0.5"
                 />
               </div>
-              <div className="flex justify-end gap-2 mt-6">
+
+              <div className="text-sm text-gray-400">
+                Items will be sorted by: (profit × {profitWeight || "0"}) +
+                (demand × {demandWeight || "0"})
+              </div>
+
+              <div className="flex gap-3 pt-4">
                 <button
-                  onClick={() => {
-                    setInitialWeights(currentSort);
-                    setShowCustomModal(false);
-                    if (currentSort === "custom") {
-                      onSortChange("profit");
-                    }
-                  }}
-                  className="h-9 px-4 text-gray-400 hover:text-gray-200"
+                  onClick={handleCustomSubmit}
+                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Apply
+                </button>
+                <button
+                  onClick={() => setShowCustomModal(false)}
+                  className="flex-1 bg-gray-600 text-gray-200 py-2 px-4 rounded-md hover:bg-gray-700 transition-colors"
                 >
                   Cancel
                 </button>
-                <button
-                  onClick={handleCustomSubmit}
-                  className="h-9 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Price Settings Modal */}
+      {showPriceModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-200">
+                Price Settings
+              </h3>
+              <button
+                onClick={resetPriceSettings}
+                className="text-gray-400 hover:text-gray-200"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
                 >
-                  Apply
+                  <path
+                    fillRule="evenodd"
+                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-3">
+                  Ingredient Price Type
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="ingredientPrice"
+                      value="buyPrice"
+                      checked={
+                        tempPriceSettings.ingredientPriceType === "buyPrice"
+                      }
+                      onChange={(e) =>
+                        setTempPriceSettings({
+                          ...tempPriceSettings,
+                          ingredientPriceType: e.target.value as
+                            | "buyPrice"
+                            | "sellPrice",
+                        })
+                      }
+                      className="mr-2"
+                    />
+                    <span className="text-gray-200">Insta buy price</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="ingredientPrice"
+                      value="sellPrice"
+                      checked={
+                        tempPriceSettings.ingredientPriceType === "sellPrice"
+                      }
+                      onChange={(e) =>
+                        setTempPriceSettings({
+                          ...tempPriceSettings,
+                          ingredientPriceType: e.target.value as
+                            | "buyPrice"
+                            | "sellPrice",
+                        })
+                      }
+                      className="mr-2"
+                    />
+                    <span className="text-gray-200">Buy order price</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-3">
+                  Output Item Price Type
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="outputPrice"
+                      value="buyPrice"
+                      checked={tempPriceSettings.outputPriceType === "buyPrice"}
+                      onChange={(e) =>
+                        setTempPriceSettings({
+                          ...tempPriceSettings,
+                          outputPriceType: e.target.value as
+                            | "buyPrice"
+                            | "sellPrice",
+                        })
+                      }
+                      className="mr-2"
+                    />
+                    <span className="text-gray-200">Sell Order Price</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="outputPrice"
+                      value="sellPrice"
+                      checked={
+                        tempPriceSettings.outputPriceType === "sellPrice"
+                      }
+                      onChange={(e) =>
+                        setTempPriceSettings({
+                          ...tempPriceSettings,
+                          outputPriceType: e.target.value as
+                            | "buyPrice"
+                            | "sellPrice",
+                        })
+                      }
+                      className="mr-2"
+                    />
+                    <span className="text-gray-200">Instasell Price</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="text-sm text-gray-400 bg-gray-700 p-3 rounded">
+                <strong>Note:</strong> These settings determine which bazaar
+                prices are used for profit calculations. Changes require a data
+                refresh to take effect.
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={handlePriceSettingsSubmit}
+                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isApplyingSettings}
+                >
+                  {isApplyingSettings ? "Applying..." : "Apply Settings"}
+                </button>
+                <button
+                  onClick={resetPriceSettings}
+                  className="flex-1 bg-gray-600 text-gray-200 py-2 px-4 rounded-md hover:bg-gray-700 transition-colors"
+                  disabled={isApplyingSettings}
+                >
+                  Cancel
                 </button>
               </div>
             </div>
@@ -691,7 +910,10 @@ const ItemCard = ({ item, onClick }: ItemCardProps) => {
               isProfitNegative ? "text-red-400" : "text-green-400"
             } mb-1`}
           >
-            {item.profit.toLocaleString()} coins
+            {item.profit.toLocaleString()} coins{" "}
+            <span className="text-gray-400">
+              ({item.cost.toLocaleString()})
+            </span>
           </p>
           <p className="text-xs text-gray-400">
             Demand: {item.demand.toLocaleString()}
@@ -712,9 +934,10 @@ const ItemCard = ({ item, onClick }: ItemCardProps) => {
 
 interface ItemGridProps {
   items: Item[];
+  onDataRefresh?: (priceSettings: PriceSettings) => Promise<void>;
 }
 
-export default function ItemGrid({ items }: ItemGridProps) {
+export default function ItemGrid({ items, onDataRefresh }: ItemGridProps) {
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [sortOption, setSortOption] = useState<SortOption>("profit");
   const [customWeights, setCustomWeights] = useState<CustomWeights>({
@@ -726,6 +949,29 @@ export default function ItemGrid({ items }: ItemGridProps) {
   const [copeMode, setCopeMode] = useState(false);
   const [copeItems, setCopeItems] = useState<Item[]>([]);
   const [loadingCope, setLoadingCope] = useState(false);
+  const [priceSettings, setPriceSettings] = useState<PriceSettings>({
+    ingredientPriceType: "buyPrice",
+    outputPriceType: "buyPrice",
+  });
+
+  // Load price settings from localStorage on component mount
+  useEffect(() => {
+    const savedSettings = localStorage.getItem("priceSettings");
+    if (savedSettings) {
+      try {
+        const parsed = JSON.parse(savedSettings);
+        setPriceSettings(parsed);
+      } catch (error) {
+        console.error("Error loading price settings from localStorage:", error);
+      }
+    }
+  }, []);
+
+  // Save price settings to localStorage when they change
+  const handlePriceSettingsChange = (newSettings: PriceSettings) => {
+    setPriceSettings(newSettings);
+    localStorage.setItem("priceSettings", JSON.stringify(newSettings));
+  };
 
   // Fetch COPE-adjusted items when COPE mode is toggled
   useEffect(() => {
@@ -825,6 +1071,9 @@ export default function ItemGrid({ items }: ItemGridProps) {
         setShowCustomModal={setShowCustomModal}
         copeMode={copeMode}
         onCopeToggle={setCopeMode}
+        priceSettings={priceSettings}
+        onPriceSettingsChange={handlePriceSettingsChange}
+        onDataRefresh={onDataRefresh}
       />
       {loadingCope && (
         <div className="text-center text-gray-300 mb-4">

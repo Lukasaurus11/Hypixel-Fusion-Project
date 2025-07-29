@@ -11,15 +11,19 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
 
-  const fetchData = async (forceUpdate = false) => {
+  const fetchData = async (forceUpdate = false, priceSettings?: any) => {
     try {
       setLoading(true);
       setError(null);
 
       if (forceUpdate) {
-        // Update data
+        // Update data with price settings
         const updateResponse = await fetch("/api/update-data", {
           method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ priceSettings }),
         });
 
         if (!updateResponse.ok) {
@@ -58,9 +62,9 @@ export default function Home() {
     fetchData(false);
   }, []);
 
-  const handleRefresh = async () => {
+  const handleRefresh = async (priceSettings?: any) => {
     try {
-      await fetchData(true);
+      await fetchData(true, priceSettings);
     } catch (error) {
       console.error("Error refreshing data:", error);
       throw error;
@@ -88,7 +92,7 @@ export default function Home() {
       <h1 className="text-3xl font-bold text-center mb-8 text-gray-100">
         Shard Fusion Profit Website
       </h1>
-      <ItemGrid items={items} />
+      <ItemGrid items={items} onDataRefresh={handleRefresh} />
       <Footer lastUpdated={lastUpdate || "Never"} onRefresh={handleRefresh} />
     </main>
   );

@@ -3,6 +3,7 @@ export interface Item {
   output_item: string;
   demand: number;
   profit: number;
+  cost: number;
   ingredients: string;
   id: string; // Adding ID field for image mapping
 }

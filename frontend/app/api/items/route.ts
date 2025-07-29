@@ -9,22 +9,40 @@ export async function GET() {
       path.join(process.cwd(), "data", "shard_recipes.db")
     );
 
+    // Check if cost column exists
+    const tableInfo = db.prepare("PRAGMA table_info(shard_profit_data)").all();
+    const hasCostColumn = tableInfo.some(
+      (column: any) => column.name === "cost"
+    );
+
     // Get all items, sorted by profit
-    const items = db
-      .prepare(
-        `
+    const selectQuery = hasCostColumn
+      ? `
       SELECT 
         recipe_id,
         output_item,
         demand,
         profit,
+        cost,
         ingredients,
         id
       FROM shard_profit_data
       ORDER BY profit DESC
     `
-      )
-      .all();
+      : `
+      SELECT 
+        recipe_id,
+        output_item,
+        demand,
+        profit,
+        0 as cost,
+        ingredients,
+        id
+      FROM shard_profit_data
+      ORDER BY profit DESC
+    `;
+
+    const items = db.prepare(selectQuery).all();
 
     // Group items by output_item, keeping all recipes
     const groupedItems = items.reduce((acc: any, item) => {
