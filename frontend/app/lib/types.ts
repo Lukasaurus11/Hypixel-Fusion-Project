@@ -68,3 +68,26 @@ export interface PriceHistoryEntry {
   sell: number;
   timestamp: string;
 }
+
+export interface Shard {
+  name: string;
+  productID: string;
+  rarity: string;
+  family: string;
+  craftingID: string;
+}
+
+export interface ShardRecipe {
+  recipe_id: number;
+  output_item: string;
+  demand: number;
+  profit: number;
+  cost: number;
+  ingredients: string;
+  id: string;
+  quantity_1: number;
+  ingredient_1: string;
+  quantity_2: number;
+  ingredient_2: string;
+  output_quantity: number;
+}

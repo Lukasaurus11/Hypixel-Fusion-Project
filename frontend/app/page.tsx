@@ -88,7 +88,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-900 p-8 pb-16">
+    <main className="h-screen bg-gray-900 p-8 overflow-hidden flex flex-col">
       <h1 className="text-3xl font-bold text-center mb-8 text-gray-100">
         Shard Fusion Profit Website
       </h1>

@@ -1,6 +1,7 @@
-import { Item } from "@/types/items";
+import { Item } from "../types/items";
 import { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
+import ShardRecipesTab from "./ShardRecipesTab";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -27,6 +28,7 @@ ChartJS.register(
 );
 
 type SortOption = "profit" | "demand" | "custom";
+type TabOption = "shard-profits" | "shard-recipes";
 
 interface CustomWeights {
   profit: number;
@@ -50,6 +52,8 @@ interface ToolbarProps {
   priceSettings: PriceSettings;
   onPriceSettingsChange: (settings: PriceSettings) => void;
   onDataRefresh?: (priceSettings: PriceSettings) => Promise<void>;
+  activeTab: TabOption;
+  onTabChange: (tab: TabOption) => void;
 }
 
 const Toolbar = ({
@@ -64,6 +68,8 @@ const Toolbar = ({
   priceSettings,
   onPriceSettingsChange,
   onDataRefresh,
+  activeTab,
+  onTabChange,
 }: ToolbarProps) => {
   const [profitWeight, setProfitWeight] = useState<string>("1");
   const [demandWeight, setDemandWeight] = useState<string>("1");
@@ -179,14 +185,25 @@ const Toolbar = ({
         {/* Left side - Tabs and COPE toggle */}
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <button className="h-9 px-4 bg-gray-800 text-gray-200 rounded-md border border-gray-700 hover:bg-gray-700 transition-colors">
+            <button
+              onClick={() => onTabChange("shard-profits")}
+              className={`h-9 px-4 rounded-md border border-gray-700 transition-colors ${
+                activeTab === "shard-profits"
+                  ? "bg-gray-800 text-gray-200"
+                  : "text-gray-400 hover:bg-gray-800"
+              }`}
+            >
               Shard Profits
             </button>
             <button
-              className="h-9 px-4 text-gray-400 rounded-md hover:bg-gray-800 transition-colors"
-              disabled
+              onClick={() => onTabChange("shard-recipes")}
+              className={`h-9 px-4 rounded-md border border-gray-700 transition-colors ${
+                activeTab === "shard-recipes"
+                  ? "bg-gray-800 text-gray-200"
+                  : "text-gray-400 hover:bg-gray-800"
+              }`}
             >
-              Coming soon...
+              Shard Recipes
             </button>
           </div>
 
@@ -949,6 +966,7 @@ export default function ItemGrid({ items, onDataRefresh }: ItemGridProps) {
   const [copeMode, setCopeMode] = useState(false);
   const [copeItems, setCopeItems] = useState<Item[]>([]);
   const [loadingCope, setLoadingCope] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabOption>("shard-profits");
   const [priceSettings, setPriceSettings] = useState<PriceSettings>({
     ingredientPriceType: "buyPrice",
     outputPriceType: "buyPrice",
@@ -1061,7 +1079,7 @@ export default function ItemGrid({ items, onDataRefresh }: ItemGridProps) {
   };
 
   return (
-    <>
+    <div className="flex-1 flex flex-col overflow-hidden">
       <Toolbar
         onSortChange={handleSortChange}
         onCustomWeightsChange={setCustomWeights}
@@ -1074,28 +1092,40 @@ export default function ItemGrid({ items, onDataRefresh }: ItemGridProps) {
         priceSettings={priceSettings}
         onPriceSettingsChange={handlePriceSettingsChange}
         onDataRefresh={onDataRefresh}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
       />
-      {loadingCope && (
-        <div className="text-center text-gray-300 mb-4">
-          Loading COPE calculations...
-        </div>
-      )}
-      <div className="grid grid-cols-5 gap-2">
-        {filteredAndSortedRecipes.map((item) => (
-          <ItemCard
-            key={item.recipe_id}
-            item={item}
-            onClick={() => setSelectedItem(item.output_item)}
-          />
-        ))}
-      </div>
+      {activeTab === "shard-profits" && (
+        <>
+          <div className="flex-1 overflow-y-auto scrollbar-hide">
+            {loadingCope && (
+              <div className="text-center text-gray-300 mb-4">
+                Loading COPE calculations...
+              </div>
+            )}
+            <div className="grid grid-cols-5 gap-2">
+              {filteredAndSortedRecipes.map((item) => (
+                <ItemCard
+                  key={item.recipe_id}
+                  item={item}
+                  onClick={() => setSelectedItem(item.output_item)}
+                />
+              ))}
+            </div>
+          </div>
 
-      {selectedItem && itemsByOutput[selectedItem] && (
-        <RecipeModal
-          recipes={itemsByOutput[selectedItem]}
-          onClose={() => setSelectedItem(null)}
-        />
+          {selectedItem && itemsByOutput[selectedItem] && (
+            <RecipeModal
+              recipes={itemsByOutput[selectedItem]}
+              onClose={() => setSelectedItem(null)}
+            />
+          )}
+        </>
       )}
-    </>
+
+      {activeTab === "shard-recipes" && (
+        <ShardRecipesTab isActive={activeTab === "shard-recipes"} />
+      )}
+    </div>
   );
 }
