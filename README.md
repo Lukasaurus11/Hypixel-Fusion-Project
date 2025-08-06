@@ -1,4 +1,4 @@
-# Hypixel SkyBlock Shard Fusion Profit Calculator
+# Hypixel SkyBlock Shard Fusion Profit Calculator (OUTDATED AS  PER THE LAST FORAGING UPDATE)
 
 A modern web application for calculating the most profitable shard fusion recipes in Hypixel SkyBlock, featuring real-time bazaar data and an intuitive interface.
 
