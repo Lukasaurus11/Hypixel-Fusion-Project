@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import { Shard, ShardRecipe } from "../app/lib/types";
 
@@ -17,6 +17,10 @@ export default function ShardRecipesTab({ isActive }: ShardRecipesTabProps) {
   const [error, setError] = useState<string | null>(null);
   const [shardScrollTop, setShardScrollTop] = useState(0);
   const [shardSearchQuery, setShardSearchQuery] = useState("");
+  const [selectedOutputFilter, setSelectedOutputFilter] = useState<
+    string | null
+  >(null);
+  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
@@ -24,6 +28,9 @@ export default function ShardRecipesTab({ isActive }: ShardRecipesTabProps) {
     totalPages: 0,
     hasMore: false,
   });
+
+  // Ref for the dropdown to handle click outside
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Virtual scrolling constants for shard list
   const SHARD_ITEM_HEIGHT = 72; // Height of each shard card (includes margin)
@@ -35,6 +42,26 @@ export default function ShardRecipesTab({ isActive }: ShardRecipesTabProps) {
       fetchShards();
     }
   }, [isActive]);
+
+  // Handle click outside dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsFilterDropdownOpen(false);
+      }
+    };
+
+    if (isFilterDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isFilterDropdownOpen]);
 
   const fetchShards = async () => {
     try {
@@ -84,6 +111,8 @@ export default function ShardRecipesTab({ isActive }: ShardRecipesTabProps) {
 
   const handleShardClick = (shardName: string) => {
     setSelectedShard(shardName);
+    setSelectedOutputFilter(null); // Reset filter when selecting a new shard
+    setIsFilterDropdownOpen(false); // Close dropdown if open
     fetchRecipesByShard(shardName);
   };
 
@@ -150,6 +179,74 @@ export default function ShardRecipesTab({ isActive }: ShardRecipesTabProps) {
   const handleShardSearchChange = (query: string) => {
     setShardSearchQuery(query);
     setShardScrollTop(0); // Reset scroll position when search changes
+  };
+
+  // Get unique output items from recipes for filtering
+  const getUniqueOutputItems = () => {
+    const uniqueItems = Array.from(
+      new Set(recipes.map((recipe) => recipe.output_item.trim()))
+    ).sort((a, b) => a.localeCompare(b));
+    return uniqueItems;
+  };
+
+  // Filter recipes based on selected output filter
+  const filteredRecipes = React.useMemo(() => {
+    console.log(
+      `🔄 FILTERING: Filter="${selectedOutputFilter}", Recipe count=${recipes.length}`
+    );
+
+    if (!selectedOutputFilter) {
+      console.log(`✅ No filter - returning all ${recipes.length} recipes`);
+      return recipes;
+    }
+
+    const filtered = recipes.filter((recipe) => {
+      const recipeOutput = recipe.output_item.trim();
+      const filterValue = selectedOutputFilter.trim();
+      const matches = recipeOutput === filterValue;
+
+      // Log every comparison for debugging
+      console.log(
+        `🔍 Recipe ${recipe.recipe_id}: "${recipeOutput}" === "${filterValue}" ? ${matches}`
+      );
+
+      return matches;
+    });
+
+    console.log(
+      `✅ Filtered to ${filtered.length} recipes from ${recipes.length} total`
+    );
+    return filtered;
+  }, [recipes, selectedOutputFilter]);
+
+  // Handle output filter selection
+  const handleOutputFilterChange = (outputItem: string | null) => {
+    setSelectedOutputFilter(outputItem);
+    setIsFilterDropdownOpen(false);
+
+    // Debug logging to help identify filtering issues
+    if (outputItem) {
+      console.log(`\n=== FILTER DEBUG ===`);
+      console.log(`Filter set to: "${outputItem}"`);
+      console.log(`Filter length: ${outputItem.length}`);
+      console.log(`Filter trimmed: "${outputItem.trim()}"`);
+      console.log(`Filter trimmed length: ${outputItem.trim().length}`);
+
+      recipes.forEach((recipe, index) => {
+        const trimmedOutput = recipe.output_item.trim();
+        const trimmedFilter = outputItem.trim();
+        const matches = trimmedOutput === trimmedFilter;
+        console.log(
+          `Recipe ${index}: "${recipe.output_item}" (len: ${recipe.output_item.length}) -> "${trimmedOutput}" (len: ${trimmedOutput.length}) -> Matches: ${matches}`
+        );
+      });
+
+      const matchingRecipes = recipes.filter(
+        (recipe) => recipe.output_item.trim() === outputItem.trim()
+      );
+      console.log(`Total matching recipes: ${matchingRecipes.length}`);
+      console.log("===================\n");
+    }
   };
 
   if (!isActive) {
@@ -309,77 +406,221 @@ export default function ShardRecipesTab({ isActive }: ShardRecipesTabProps) {
         ) : (
           <div className="p-4">
             <div className="border-b border-gray-700 pb-4 mb-4">
-              <h3 className="text-lg font-semibold text-gray-100">
-                Recipes using {selectedShard} ({recipes.length})
-              </h3>
-              <p className="text-sm text-gray-400 mt-1">
-                Sorted by profit (highest first) • All recipes loaded
-              </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-100">
+                    Recipes using {selectedShard} ({filteredRecipes.length}
+                    {filteredRecipes.length !== recipes.length &&
+                      ` of ${recipes.length}`}
+                    )
+                  </h3>
+                  <p className="text-sm text-gray-400 mt-1">
+                    Sorted by profit (highest first) • All recipes loaded
+                    {selectedOutputFilter && (
+                      <span className="ml-2">
+                        • Filtered by: {selectedOutputFilter}
+                      </span>
+                    )}
+                  </p>
+                </div>
+
+                {/* Output Filter Dropdown */}
+                <div className="relative" ref={dropdownRef}>
+                  <button
+                    onClick={() =>
+                      setIsFilterDropdownOpen(!isFilterDropdownOpen)
+                    }
+                    className="flex items-center gap-2 px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 hover:bg-gray-600 transition-colors"
+                  >
+                    <span className="text-sm">
+                      {selectedOutputFilter
+                        ? selectedOutputFilter
+                        : "All Shards"}
+                    </span>
+                    <svg
+                      className={`w-4 h-4 transition-transform ${
+                        isFilterDropdownOpen ? "rotate-180" : ""
+                      }`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </button>
+
+                  {isFilterDropdownOpen && (
+                    <div className="absolute right-0 top-full mt-1 w-64 bg-gray-800 border border-gray-600 rounded-md shadow-lg z-10 max-h-60 overflow-y-auto">
+                      <button
+                        onClick={() => handleOutputFilterChange(null)}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-700 transition-colors ${
+                          !selectedOutputFilter
+                            ? "bg-blue-600 text-white"
+                            : "text-gray-200"
+                        }`}
+                      >
+                        All Shards ({recipes.length})
+                      </button>
+                      {getUniqueOutputItems().map((outputItem) => {
+                        const count = recipes.filter(
+                          (recipe) =>
+                            recipe.output_item.trim() === outputItem.trim()
+                        ).length;
+                        return (
+                          <button
+                            key={outputItem}
+                            onClick={() => handleOutputFilterChange(outputItem)}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-700 transition-colors ${
+                              selectedOutputFilter?.trim() === outputItem.trim()
+                                ? "bg-blue-600 text-white"
+                                : "text-gray-200"
+                            }`}
+                          >
+                            {outputItem} ({count})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
-            {/* All recipes displayed */}
-            <div className="grid grid-cols-5 gap-2">
-              {recipes.map((recipe) => {
+            {/* All recipes displayed - One per row */}
+            <div className="space-y-3">
+              {/* Debug info */}
+              <div className="p-2 bg-red-900 border border-red-600 rounded text-xs text-red-200 mb-3">
+                <strong>LIVE DEBUG:</strong>
+                <br />
+                Filter: "{selectedOutputFilter || "NONE"}" | Total Recipes:{" "}
+                {recipes.length} | Filtered Recipes: {filteredRecipes.length} |
+                Should Show:{" "}
+                {selectedOutputFilter
+                  ? recipes.filter(
+                      (r) =>
+                        r.output_item.trim() === selectedOutputFilter.trim()
+                    ).length
+                  : recipes.length}
+                <br />
+                Recipes shown:{" "}
+                {filteredRecipes
+                  .map((r) => `${r.recipe_id}(${r.output_item.trim()})`)
+                  .join(", ")
+                  .substring(0, 200)}
+                ...
+              </div>
+
+              {filteredRecipes.map((recipe) => {
                 const isProfitNegative = recipe.profit < 0;
                 const ingredients = parseIngredients(recipe.ingredients);
 
                 return (
                   <div
-                    key={recipe.recipe_id}
-                    className="p-3 bg-gray-800 rounded border border-gray-700 cursor-pointer hover:border-gray-500 transition-colors"
+                    key={`${recipe.recipe_id}-${selectedOutputFilter || "all"}`}
+                    className="p-4 bg-gray-800 rounded-lg border border-gray-700 cursor-pointer hover:border-gray-500 transition-colors"
                   >
-                    <div className="flex items-center gap-3 mb-2">
+                    <div className="flex items-start gap-4">
+                      {/* Shard Icon */}
                       <div className="flex-shrink-0">
                         <Image
                           src={`/shardIcons/${recipe.id}.png`}
                           alt={recipe.id}
-                          width={40}
-                          height={40}
+                          width={48}
+                          height={48}
                           className="rounded"
-                          style={{ width: "40px", height: "40px" }}
+                          style={{ width: "48px", height: "48px" }}
                         />
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-200 mb-1">
-                          {recipe.output_item}
-                        </p>
-                        <p
-                          className={`text-sm font-medium ${
-                            isProfitNegative ? "text-red-400" : "text-green-400"
-                          } mb-1`}
-                        >
-                          {formatNumber(recipe.profit)} coins{" "}
-                          <span className="text-gray-400">
-                            ({formatNumber(recipe.cost)})
-                          </span>
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          Demand: {formatNumber(recipe.demand)}
-                        </p>
+
+                      {/* Recipe Details */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <h4 className="text-lg font-medium text-gray-200 mb-1">
+                              {recipe.output_item}
+                              <div className="text-xs text-gray-500 mt-1">
+                                Recipe ID: {recipe.recipe_id} | Output: "
+                                {recipe.output_item.trim()}"
+                                {selectedOutputFilter && (
+                                  <span
+                                    className={`ml-2 font-bold ${
+                                      recipe.output_item.trim() ===
+                                      selectedOutputFilter.trim()
+                                        ? "text-green-400"
+                                        : "text-red-400"
+                                    }`}
+                                  >
+                                    {recipe.output_item.trim() ===
+                                    selectedOutputFilter.trim()
+                                      ? "✅ SHOULD SHOW"
+                                      : "❌ SHOULD NOT SHOW"}
+                                  </span>
+                                )}
+                              </div>
+                            </h4>
+                            <div className="flex items-center gap-4">
+                              <p
+                                className={`text-base font-medium ${
+                                  isProfitNegative
+                                    ? "text-red-400"
+                                    : "text-green-400"
+                                }`}
+                              >
+                                {formatNumber(recipe.profit)} coins profit
+                              </p>
+                              <p className="text-sm text-gray-400">
+                                Cost: {formatNumber(recipe.cost)} coins
+                              </p>
+                              <p className="text-sm text-gray-400">
+                                Demand: {formatNumber(recipe.demand)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Ingredients */}
+                        <div>
+                          <p className="text-sm font-medium text-gray-300 mb-2">
+                            Ingredients:
+                          </p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            {ingredients.length > 0 ? (
+                              ingredients.map((ingredient, index) => (
+                                <div
+                                  key={`${ingredient.name}-${index}`}
+                                  className="flex items-center justify-between p-2 bg-gray-700 rounded text-xs"
+                                >
+                                  <span className="text-gray-300">
+                                    {ingredient.amount}x {ingredient.name}
+                                  </span>
+                                  <span className="text-gray-400">
+                                    {formatNumber(ingredient.cost)} coins
+                                  </span>
+                                </div>
+                              ))
+                            ) : (
+                              <>
+                                <div className="flex items-center justify-between p-2 bg-gray-700 rounded text-xs">
+                                  <span className="text-gray-300">
+                                    {recipe.quantity_1}x {recipe.ingredient_1}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between p-2 bg-gray-700 rounded text-xs">
+                                  <span className="text-gray-300">
+                                    {recipe.quantity_2}x {recipe.ingredient_2}
+                                  </span>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <ul className="text-xs text-gray-500 list-disc list-inside space-y-0.5">
-                      {ingredients.length > 0 ? (
-                        ingredients.map((ingredient, index) => (
-                          <li
-                            key={`${ingredient.name}-${index}`}
-                            className="truncate"
-                          >
-                            {ingredient.amount}x {ingredient.name} - Cost:{" "}
-                            {formatNumber(ingredient.cost)} coins
-                          </li>
-                        ))
-                      ) : (
-                        <>
-                          <li className="truncate">
-                            {recipe.quantity_1}x {recipe.ingredient_1}
-                          </li>
-                          <li className="truncate">
-                            {recipe.quantity_2}x {recipe.ingredient_2}
-                          </li>
-                        </>
-                      )}
-                    </ul>
                   </div>
                 );
               })}

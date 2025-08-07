@@ -56,16 +56,34 @@ export async function getBazaarInformation(
     const transaction = db.transaction(() => {
       for (const [productId, product] of Object.entries(products)) {
         const status = product.quick_status;
+
+        // Handle SHARD_BOGGED case - use SHARD_SEA_ARCHER data instead
+        let finalProductId = productId;
+        let finalStatus = status;
+
+        if (productId === "SHARD_BOGGED") {
+          // Check if SHARD_SEA_ARCHER exists in the products
+          if (products["SHARD_SEA_ARCHER"]) {
+            finalProductId = "SHARD_BOGGED"; // Keep the original ID for database
+            finalStatus = products["SHARD_SEA_ARCHER"].quick_status;
+          }
+        } else if (productId === "SHARD_LOCH_EMPEROR") {
+          if (products["SHARD_SEA_EMPEROR"]) {
+            finalProductId = "SHARD_LOCH_EMPEROR"; // Keep the original ID for database
+            finalStatus = products["SHARD_SEA_EMPEROR"].quick_status;
+          }
+        }
+
         insertStmt.run(
-          productId,
-          status.sellPrice,
-          status.sellVolume,
-          status.sellMovingWeek,
-          status.sellOrders,
-          status.buyPrice,
-          status.buyVolume,
-          status.buyMovingWeek,
-          status.buyOrders
+          finalProductId,
+          finalStatus.sellPrice,
+          finalStatus.sellVolume,
+          finalStatus.sellMovingWeek,
+          finalStatus.sellOrders,
+          finalStatus.buyPrice,
+          finalStatus.buyVolume,
+          finalStatus.buyMovingWeek,
+          finalStatus.buyOrders
         );
       }
     });

@@ -47,6 +47,17 @@ export function calculateAccurateProfit(
       return acc;
     }, {});
 
+    // Apply shard mapping logic for missing items
+    // If SHARD_BOGGED is missing, use SHARD_SEA_ARCHER data
+    if (!bazaarData["SHARD_BOGGED"] && bazaarData["SHARD_SEA_ARCHER"]) {
+      bazaarData["SHARD_BOGGED"] = bazaarData["SHARD_SEA_ARCHER"];
+    }
+
+    // If SHARD_LOCH_EMPEROR is missing, use SHARD_SEA_EMPEROR data
+    if (!bazaarData["SHARD_LOCH_EMPEROR"] && bazaarData["SHARD_SEA_EMPEROR"]) {
+      bazaarData["SHARD_LOCH_EMPEROR"] = bazaarData["SHARD_SEA_EMPEROR"];
+    }
+
     // Get product mapping data for family checking
     const productRows = db
       .prepare(
