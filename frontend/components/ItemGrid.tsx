@@ -51,7 +51,10 @@ interface ToolbarProps {
   onCopeToggle: (enabled: boolean) => void;
   priceSettings: PriceSettings;
   onPriceSettingsChange: (settings: PriceSettings) => void;
-  onDataRefresh?: (priceSettings: PriceSettings) => Promise<void>;
+  onDataRefresh?: (
+    priceSettings: PriceSettings,
+    copeMode?: boolean
+  ) => Promise<void>;
   activeTab: TabOption;
   onTabChange: (tab: TabOption) => void;
 }
@@ -163,7 +166,7 @@ const Toolbar = ({
     // Trigger data refresh with new price settings
     if (onDataRefresh) {
       try {
-        await onDataRefresh(tempPriceSettings);
+        await onDataRefresh(tempPriceSettings, copeMode);
       } catch (error) {
         console.error("Error refreshing data with new price settings:", error);
         alert("Failed to refresh data with new settings. Please try again.");
@@ -951,10 +954,20 @@ const ItemCard = ({ item, onClick }: ItemCardProps) => {
 
 interface ItemGridProps {
   items: Item[];
-  onDataRefresh?: (priceSettings: PriceSettings) => Promise<void>;
+  copeMode: boolean;
+  onCopeToggle: (enabled: boolean) => void;
+  onDataRefresh?: (
+    priceSettings: PriceSettings,
+    copeMode?: boolean
+  ) => Promise<void>;
 }
 
-export default function ItemGrid({ items, onDataRefresh }: ItemGridProps) {
+export default function ItemGrid({
+  items,
+  copeMode,
+  onCopeToggle,
+  onDataRefresh,
+}: ItemGridProps) {
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [sortOption, setSortOption] = useState<SortOption>("profit");
   const [customWeights, setCustomWeights] = useState<CustomWeights>({
@@ -963,9 +976,6 @@ export default function ItemGrid({ items, onDataRefresh }: ItemGridProps) {
   });
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [copeMode, setCopeMode] = useState(false);
-  const [copeItems, setCopeItems] = useState<Item[]>([]);
-  const [loadingCope, setLoadingCope] = useState(false);
   const [activeTab, setActiveTab] = useState<TabOption>("shard-profits");
   const [priceSettings, setPriceSettings] = useState<PriceSettings>({
     ingredientPriceType: "buyPrice",
@@ -991,34 +1001,8 @@ export default function ItemGrid({ items, onDataRefresh }: ItemGridProps) {
     localStorage.setItem("priceSettings", JSON.stringify(newSettings));
   };
 
-  // Fetch COPE-adjusted items when COPE mode is toggled
-  useEffect(() => {
-    const fetchCopeItems = async () => {
-      if (copeMode) {
-        setLoadingCope(true);
-        try {
-          const response = await fetch("/api/items-cope");
-          const data = await response.json();
-          if (data.error) {
-            console.error("Error fetching COPE items:", data.error);
-            return;
-          }
-          // Convert grouped items to flat array
-          const flatItems = Object.values(data.items).flat() as Item[];
-          setCopeItems(flatItems);
-        } catch (error) {
-          console.error("Error fetching COPE items:", error);
-        } finally {
-          setLoadingCope(false);
-        }
-      }
-    };
-
-    fetchCopeItems();
-  }, [copeMode]);
-
-  // Use COPE items if COPE mode is enabled, otherwise use regular items
-  const currentItems = copeMode ? copeItems : items;
+  // Use items directly since COPE mode is now handled during profit calculation
+  const currentItems = items;
 
   // Group items by output_item
   const itemsByOutput = currentItems.reduce(
@@ -1078,6 +1062,21 @@ export default function ItemGrid({ items, onDataRefresh }: ItemGridProps) {
     setSortOption(option);
   };
 
+  const handleCopeToggle = async (enabled: boolean) => {
+    // Call the parent's onCopeToggle function
+    onCopeToggle(enabled);
+
+    // Always refresh data to recalculate profits with the new COPE mode setting
+    if (onDataRefresh) {
+      try {
+        await onDataRefresh(priceSettings, enabled);
+      } catch (error) {
+        console.error("Error refreshing data with COPE mode:", error);
+        // Note: We don't revert the toggle here since the parent component manages the state
+      }
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <Toolbar
@@ -1088,7 +1087,7 @@ export default function ItemGrid({ items, onDataRefresh }: ItemGridProps) {
         showCustomModal={showCustomModal}
         setShowCustomModal={setShowCustomModal}
         copeMode={copeMode}
-        onCopeToggle={setCopeMode}
+        onCopeToggle={handleCopeToggle}
         priceSettings={priceSettings}
         onPriceSettingsChange={handlePriceSettingsChange}
         onDataRefresh={onDataRefresh}
@@ -1098,11 +1097,6 @@ export default function ItemGrid({ items, onDataRefresh }: ItemGridProps) {
       {activeTab === "shard-profits" && (
         <>
           <div className="flex-1 overflow-y-auto scrollbar-hide">
-            {loadingCope && (
-              <div className="text-center text-gray-300 mb-4">
-                Loading COPE calculations...
-              </div>
-            )}
             <div className="grid grid-cols-5 gap-2">
               {filteredAndSortedRecipes.map((item) => (
                 <ItemCard

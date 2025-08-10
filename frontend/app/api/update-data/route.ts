@@ -8,16 +8,20 @@ import { PriceSettings } from "../../lib/types";
 
 export async function POST(request: Request) {
   try {
-    // Parse request body for price settings
+    // Parse request body for price settings and COPE mode
     let priceSettings: PriceSettings = {
       ingredientPriceType: "buyPrice",
       outputPriceType: "buyPrice",
     };
+    let copeMode = false;
 
     try {
       const body = await request.json();
       if (body.priceSettings) {
         priceSettings = body.priceSettings;
+      }
+      if (body.copeMode !== undefined) {
+        copeMode = body.copeMode;
       }
     } catch {
       // If no body or invalid JSON, use default settings
@@ -31,8 +35,8 @@ export async function POST(request: Request) {
     // Update bazaar information
     await getBazaarInformation(db);
 
-    // Calculate profits with price settings
-    calculateAccurateProfit(db, true, false, priceSettings);
+    // Calculate profits with price settings and COPE mode
+    calculateAccurateProfit(db, true, copeMode, priceSettings);
 
     // Update last update time
     const now = new Date().toISOString();

@@ -36,7 +36,16 @@ export function calculateAccurateProfit(
 
     // Get bazaar data
     const bazaarRows = db.prepare("SELECT * FROM bazaar_info").all();
-    const bazaarData = bazaarRows.reduce((acc: any, row: any) => {
+    const bazaarData: Record<
+      string,
+      {
+        sellPrice: number;
+        sellVolume: number;
+        sellOrders: number;
+        buyOrders: number;
+        buyPrice: number;
+      }
+    > = bazaarRows.reduce((acc: Record<string, any>, row: any) => {
       acc[row.product_id] = {
         sellPrice: row.sell_price,
         sellVolume: row.sell_volume,
@@ -45,7 +54,7 @@ export function calculateAccurateProfit(
         buyPrice: row.buy_price,
       };
       return acc;
-    }, {});
+    }, {} as Record<string, any>);
 
     // Apply shard mapping logic for missing items
     // If SHARD_BOGGED is missing, use SHARD_SEA_ARCHER data
@@ -89,16 +98,16 @@ export function calculateAccurateProfit(
         output_item,
       } = recipe;
 
-      if (!(bazaarData as any)[output_item]) {
+      if (!bazaarData[output_item]) {
         console.log(
           `Output item ${output_item} not found in bazaar data. Skipping this recipe.`
         );
         return;
       }
 
-      const productInfo = (bazaarData as any)[output_item];
-      const ingredient1Info = (bazaarData as any)[ingredient_1] || {};
-      const ingredient2Info = (bazaarData as any)[ingredient_2] || {};
+      const productInfo = bazaarData[output_item];
+      const ingredient1Info = bazaarData[ingredient_1] || {};
+      const ingredient2Info = bazaarData[ingredient_2] || {};
 
       if (
         skipEmptyOrders &&
@@ -108,13 +117,20 @@ export function calculateAccurateProfit(
       }
 
       const costIngredient1 =
-        ingredient1Info[priceSettings.ingredientPriceType] * quantity_1;
+        (ingredient1Info as any)[priceSettings.ingredientPriceType] *
+        quantity_1;
       const costIngredient2 =
-        ingredient2Info[priceSettings.ingredientPriceType] * quantity_2;
-      const productPrice = productInfo[priceSettings.outputPriceType];
+        (ingredient2Info as any)[priceSettings.ingredientPriceType] *
+        quantity_2;
+      const productPrice = (productInfo as any)[priceSettings.outputPriceType];
 
-      // Apply COPE mode bonus if enabled and reptile shards are present
-      let revenue = productPrice * output_quantity;
+      const baseRevenue = productPrice * output_quantity;
+      const totalCost = costIngredient1 + costIngredient2;
+
+      // Adjust revenue for COPE if applicable, then compute profit
+      let revenue = baseRevenue;
+
+      // Apply COPE mode bonus if enabled AND this specific recipe contains a reptile ingredient
       if (copeMode) {
         const ingredient1IsReptile =
           productData[ingredient_1]?.family === "Reptile";
@@ -122,13 +138,12 @@ export function calculateAccurateProfit(
           productData[ingredient_2]?.family === "Reptile";
 
         if (ingredient1IsReptile || ingredient2IsReptile) {
-          // Multiply revenue by 1.2 because reptile shards have 20% chance to double output
-          revenue = revenue * 1.2;
+          // 20% expected revenue increase due to chance to double output
+          revenue = baseRevenue * 1.2;
         }
       }
 
-      const profit = revenue - (costIngredient1 + costIngredient2);
-      const totalCost = costIngredient1 + costIngredient2;
+      const profit = revenue - totalCost;
 
       profitData[idx] = {
         output_item,

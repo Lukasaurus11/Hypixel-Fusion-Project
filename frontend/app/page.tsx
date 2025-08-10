@@ -10,8 +10,21 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+  const [copeMode, setCopeMode] = useState(false);
 
-  const fetchData = async (forceUpdate = false, priceSettings?: any) => {
+  // Load copeMode from localStorage on component mount
+  useEffect(() => {
+    const savedCopeMode = localStorage.getItem("copeMode");
+    if (savedCopeMode !== null) {
+      setCopeMode(JSON.parse(savedCopeMode));
+    }
+  }, []);
+
+  const fetchData = async (
+    forceUpdate = false,
+    priceSettings?: any,
+    copeMode?: boolean
+  ) => {
     try {
       setLoading(true);
       setError(null);
@@ -23,7 +36,7 @@ export default function Home() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ priceSettings }),
+          body: JSON.stringify({ priceSettings, copeMode }),
         });
 
         if (!updateResponse.ok) {
@@ -39,8 +52,9 @@ export default function Home() {
         setLastUpdate(lastUpdate);
       }
 
-      // Fetch items
-      const itemsResponse = await fetch("/api/items");
+      // Fetch items from the appropriate endpoint based on COPE mode
+      const endpoint = copeMode ? "/api/items-cope" : "/api/items";
+      const itemsResponse = await fetch(endpoint);
       const data = await itemsResponse.json();
 
       if (data.error) {
@@ -59,16 +73,27 @@ export default function Home() {
 
   // Initial data fetch
   useEffect(() => {
-    fetchData(false);
-  }, []);
+    fetchData(false, undefined, copeMode);
+  }, [copeMode]);
 
-  const handleRefresh = async (priceSettings?: any) => {
+  const handleRefresh = async (priceSettings?: any, copeMode?: boolean) => {
     try {
-      await fetchData(true, priceSettings);
+      // Update the local copeMode state if provided
+      if (copeMode !== undefined) {
+        setCopeMode(copeMode);
+      }
+      await fetchData(true, priceSettings, copeMode);
     } catch (error) {
       console.error("Error refreshing data:", error);
       throw error;
     }
+  };
+
+  const handleCopeToggle = (enabled: boolean) => {
+    setCopeMode(enabled);
+    // Save to localStorage
+    localStorage.setItem("copeMode", JSON.stringify(enabled));
+    // Do not fetch here; ItemGrid will call onDataRefresh which triggers an update and fetch
   };
 
   if (loading) {
@@ -92,7 +117,12 @@ export default function Home() {
       <h1 className="text-3xl font-bold text-center mb-8 text-gray-100">
         Shard Fusion Profit Website
       </h1>
-      <ItemGrid items={items} onDataRefresh={handleRefresh} />
+      <ItemGrid
+        items={items}
+        copeMode={copeMode}
+        onCopeToggle={handleCopeToggle}
+        onDataRefresh={handleRefresh}
+      />
       <Footer lastUpdated={lastUpdate || "Never"} onRefresh={handleRefresh} />
     </main>
   );
